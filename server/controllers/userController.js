@@ -1,84 +1,114 @@
 // userController.js (ESM version)
-import User from "../models/User.js";
+import User from "../models/User.js"; 
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+// 💡 NEW IMPORTS: Rate Limiter functions
+import { trackFailedLogin, resetLoginAttempts } from "../middleware/rateLimiter.js";
+import redis from "../config/redis.js";
+
+
 // Helper function to generate JWT token
-const generateToken = (id, role) => {
-  return jwt.sign({ id, role }, process.env.JWT_SECRET, {
-    expiresIn: "30d", // Token expires in 30 days
-  });
+const generateToken = (id, role, rememberMe = false) => {
+    // 💡 REMEMBER ME FIX: Token expiration should be longer if remembered
+    const expiresIn = rememberMe ? "90d" : "1d"; 
+
+    return jwt.sign({ id, role }, process.env.JWT_SECRET, {
+        expiresIn,
+    });
 };
 
-// @desc    Register a new user (Only used to register the first ADMIN)
-// @route   POST /api/auth/register
-// @access  Public (Should be restricted later)
+// @desc    Register a new user 
+// @route   POST /api/auth/register
+// @access  Public
 export const registerUser = async (req, res) => {
-  const { username, email, password, role } = req.body;
+    const { username, email, password, role } = req.body;
 
-  try {
-    let user = await User.findOne({ email });
+    try {
+        let user = await User.findOne({ email });
 
-    if (user) {
-      return res.status(400).json({ message: "User already exists" });
+        if (user) {
+            // Check 1: User found in the database
+            return res.status(400).json({ message: "User already exists" });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        user = await User.create({
+            username,
+            email,
+            password: hashedPassword,
+            role: role || "user", // Default to 'user'
+        });
+
+        res.status(201).json({
+            _id: user._id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            token: generateToken(user._id, user.role),
+        });
+    } catch (error) {
+        // ✅ CRITICAL FIX: Check for MongoDB Duplicate Key Error (Code 11000)
+        // This ensures a 400 is returned instead of crashing the server with a 500
+        if (error.code === 11000) {
+            return res.status(400).json({ message: "Email already in use. Please try logging in." });
+        }
+        
+        res
+            .status(500)
+            .json({ message: "Server error during registration", error: error.message });
     }
-
-    // Hash password before saving
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    user = await User.create({
-      username,
-      email,
-      password: hashedPassword,
-      role: role || "user", // Default to 'user' if role not specified
-    });
-
-    res.status(201).json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id, user.role),
-    });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Server error during registration", error: error.message });
-  }
 };
 
-// @desc    Authenticate a user & get token
-// @route   POST /api/auth/login
-// @access  Public
+// @desc    Authenticate a user & get token
+// @route   POST /api/auth/login
+// @access  Public
 export const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body; // 💡 Get rememberMe flag
 
-  try {
-    const user = await User.findOne({ email });
+    try {
+        const user = await User.findOne({ email });
 
-    if (user && (await bcrypt.compare(password, user.password))) {
-      res.json({
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        token: generateToken(user._id, user.role),
-      });
-    } else {
-      res.status(401).json({ message: "Invalid email or password" });
+        if (user && (await bcrypt.compare(password, user.password))) {
+            
+            // 💡 SUCCESS: Reset failure count
+            await resetLoginAttempts(email); 
+
+            const token = generateToken(user._id, user.role, rememberMe);
+
+            // 💡 REMEMBER ME CACHE: Store token in Redis if requested
+            if (rememberMe && redis && redis.status === 'ready') {
+                const sessionKey = `user_session:${user._id}`;
+                // Store the token for a long period (90 days)
+                await redis.set(sessionKey, token, 'EX', 90 * 24 * 60 * 60); 
+            }
+
+            return res.json({
+                _id: user._id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                token: token,
+            });
+        } else {
+            // 💡 FAILURE: Track failed attempt
+            await trackFailedLogin(email);
+
+            return res.status(401).json({ message: "Invalid email or password" });
+        }
+    } catch (error) {
+        res
+            .status(500)
+            .json({ message: "Server error during login", error: error.message });
     }
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Server error during login", error: error.message });
-  }
 };
 
-// @desc    Get current logged-in user details
-// @route   GET /api/auth/me
-// @access  Private (Requires JWT protection)
+// @desc    Get current logged-in user details 
+// @route   GET /api/auth/me
+// @access  Private
 export const getMe = async (req, res) => {
-  const user = await User.findById(req.user.id).select("-password");
-  res.json(user);
+    const user = await User.findById(req.user.id).select("-password");
+    res.json(user);
 };

@@ -7,12 +7,13 @@ import { Server as socketio } from 'socket.io';
 // --- Configuration Imports ---
 import connectDB from './config/db.js';
 import redis from './config/redis.js'; 
-// import { errorHandler } from './middleware/errorMiddleware.js'; 
 
 // --- Route Imports (ESM) ---
 import userRoutes from './routes/userRoutes.js';
 import adminRoutes from './routes/adminRoutes.js'; 
 import contentRoutes from './routes/contentRoutes.js'; 
+// 💡 NEW IMPORT: Website Access Counter Middleware
+import { incrementAccessCounter } from './controllers/siteController.js'; 
 
 // Load environment variables
 dotenv.config({ path: '../.env' });
@@ -39,6 +40,9 @@ io.on('connection', (socket) => {
 });
 // --- End Socket.io Setup ---
 
+// 💡 NEW MIDDLEWARE: Apply counter middleware to all incoming public requests
+app.use(incrementAccessCounter); 
+
 // Middleware
 app.use(cors());
 app.use(express.json()); // Body parser
@@ -55,7 +59,7 @@ app.use('/api/auth', userRoutes);
 // 2. Admin Content Management (Creating Subjects/Notes/Videos)
 app.use('/api/admin', adminRoutes); 
 
-// 3. Public/User Content Retrieval 
+// 3. Public/User Content Retrieval (Includes content/subjects and /content/branches)
 app.use('/api/content', contentRoutes); 
 
 // --- Error Handling Middleware (optional) ---
@@ -65,9 +69,9 @@ const PORT = process.env.PORT || 5000;
 
 // CRITICAL FIX: Prevent server from starting to listen during Jest tests
 if (process.env.NODE_ENV !== 'test') { 
-    server.listen(PORT, () => {
-        console.log(`\n🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-    });
+    server.listen(PORT, () => {
+        console.log(`\n🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    });
 }
 
 // Export the app instance for Supertest

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getAllSubjects, getSubjectContent } from '../controllers/contentController.js';
 import { getAllBranches } from '../controllers/adminController.js'; // 💡 Import Branch function
 import { cacheContent } from '../middleware/cache.js';
+import { getAccessCount } from '../controllers/siteController.js'; // 💡 NEW IMPORT
 
 const router = Router();
 
@@ -21,5 +22,8 @@ router.route('/subject/:id')
 // This endpoint is critical for the public navigation flow and MUST NOT be protected.
 router.route('/branches') 
     .get(getAllBranches); 
+
+router.route('/access-count')
+    .get(getAccessCount);
 
 export default router;
