@@ -104,6 +104,35 @@ export const trackFailedLogin = async (email, metadata = {}) => {
 };
 
 /**
+ * Tracks a successful login attempt (for auditing purposes).
+ * 
+ * @param {string} email - User email
+ * @param {object} metadata - Optional metadata (ip, userAgent, etc.)
+ */
+export const trackSuccessfulLogin = async (email, metadata = {}) => {
+    if (!redis || redis.status !== 'ready') return;
+
+    const logKey = getAttemptLogKey(email);
+
+    try {
+        const attemptData = {
+            email: email.toLowerCase(),
+            success: true,
+            timestamp: new Date().toISOString(),
+            ip: metadata.ip || 'unknown',
+            userAgent: metadata.userAgent || 'unknown'
+        };
+
+        // Store successful attempt in log
+        await redis.lpush(logKey, JSON.stringify(attemptData));
+        await redis.ltrim(logKey, 0, 19); // Keep only last 20 attempts
+        await redis.expire(logKey, 24 * 60 * 60); // Expire after 24 hours
+    } catch (error) {
+        console.error('[Redis Error] Failed to track successful login:', error);
+    }
+};
+
+/**
  * Resets the failed login counter on successful login.
  * Called on successful login in the user controller.
  */
