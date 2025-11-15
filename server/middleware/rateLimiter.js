@@ -8,6 +8,7 @@ export const LOCKOUT_TIME_SECONDS = 30 * 60; // 30 minutes
 
 // Helper to construct the key in Redis (use email to identify the user)
 const getKey = (email) => `login_fail:${email.toLowerCase()}`;
+const getAttemptLogKey = (email) => `login_attempts:${email.toLowerCase()}`;
 
 /**
  * Middleware to check if the user is currently locked out.
@@ -50,15 +51,35 @@ export const checkLockout = async (req, res, next) => {
 /**
  * Tracks a failed login attempt and locks the account if MAX_ATTEMPTS is reached.
  * Called AFTER a failed login attempt in the user controller.
+ * 
+ * @param {string} email - User email
+ * @param {object} metadata - Optional metadata (ip, userAgent, etc.)
+ * @returns {Promise<boolean>} - Returns true if account is locked
  */
-export const trackFailedLogin = async (email) => {
-    if (!redis || redis.status !== 'ready') return;
+export const trackFailedLogin = async (email, metadata = {}) => {
+    if (!redis || redis.status !== 'ready') return false;
 
     const key = getKey(email);
+    const logKey = getAttemptLogKey(email);
 
     try {
-        // INCRBY increments the failure count atomically
+        // INCR increments the failure count automaticaly
         const attempts = await redis.incr(key);
+
+        // Store detailed attempt log for security auditing
+        const attemptData = {
+            email: email.toLowerCase(),
+            success: false,
+            timestamp: new Date().toISOString(),
+            ip: metadata.ip || 'unknown',
+            userAgent: metadata.userAgent || 'unknown',
+            attempts: attempts
+        };
+
+        // Store attempt in a list (keep last 20 attempts per user)
+        await redis.lpush(logKey, JSON.stringify(attemptData));
+        await redis.ltrim(logKey, 0, 19); // Keep only last 20 attempts
+        await redis.expire(logKey, 24 * 60 * 60); // Expire after 24 hours
 
         if (attempts === 1) {
             // If this is the first failure, set the expiration window (e.g., 30 minutes)
