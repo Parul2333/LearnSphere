@@ -94,4 +94,26 @@ export const notifyNewSubject = (io, branchId, subjectData) => {
     }
  };
  
-  
+  /**
+* Notify users about subject progress update
+*/
+export const notifyProgressUpdate = (io, subjectId, percentage) => {
+    if (!io) {
+        console.warn('[Socket] Cannot notify: Socket.io instance not available');
+        return;
+    }
+   
+    try {
+        const room = `subject_${subjectId}`;
+        const notification = {
+            message: `Subject completion updated to ${percentage}%`,
+            percentage,
+            timestamp: new Date().toISOString(),
+        };
+       
+        io.to(room).emit('progress_update', notification);
+        console.log(`📢 Notified room "${room}" about progress update: ${percentage}%`);
+    } catch (error) {
+        console.error('[Socket] Error notifying progress update:', error);
+    }
+ };
