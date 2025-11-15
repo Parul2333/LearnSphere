@@ -2,6 +2,8 @@ import Subject from '../models/Subject.js';
 import Content from '../models/Content.js';
 import Branch from '../models/Branch.js'; // 💡 NEW: Import the Branch model
 import redis from '../config/redis.js'; // Use redis for cache invalidation
+import { getSocketIO } from '../utils/socket.js';
+import { notifyNewContent } from '../events/notificationEvents.js';
 
 // --- Helper Functions for Branch Management (CRUD) ---
 
@@ -158,6 +160,21 @@ export const addContentToSubject = async (req, res) => {
         // CRITICAL FIX: Check if Redis is ready before calling .del()
         if (redis && redis.status === 'ready') {
             await redis.del(`subject_content_${subjectId}`);
+        }
+
+        // Emit WebSocket notification for new content
+        const io = getSocketIO();
+        if (io) {
+            try {
+                notifyNewContent(io, subjectId, {
+                    _id: content._id,
+                    title: content.title,
+                    category: content.category,
+                    link: content.link
+                });
+            } catch (notifyError) {
+                console.warn('[Socket] Failed to notify new content:', notifyError.message);
+            }
         }
 
         res.status(201).json(content);
