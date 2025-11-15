@@ -1,8 +1,10 @@
 import redis from '../config/redis.js';
 
 // Configuration constants
-const MAX_LOGIN_ATTEMPTS = 3;
-const LOCKOUT_TIME_SECONDS = 30 * 60; // 30 minutes
+// NOTE: Per product requirement, lock the user after a single failed attempt
+// for 30 minutes. Adjust MAX_LOGIN_ATTEMPTS if you'd prefer a higher threshold.
+const MAX_LOGIN_ATTEMPTS = 1;
+export const LOCKOUT_TIME_SECONDS = 30 * 60; // 30 minutes
 
 // Helper to construct the key in Redis (use email to identify the user)
 const getKey = (email) => `login_fail:${email.toLowerCase()}`;
@@ -28,8 +30,11 @@ export const checkLockout = async (req, res, next) => {
         // If TTL is positive, the key exists and the user is locked out
         if (ttl > 0) {
             const minutesLeft = Math.ceil(ttl / 60);
-            return res.status(403).json({
-                message: `Account locked due to too many failed attempts. Please try again in ${minutesLeft} minutes.`,
+            // Inform client of retry-after (seconds)
+            res.set('Retry-After', String(ttl));
+            return res.status(429).json({
+                message: `Account locked due to too many failed attempts. Try again in ${minutesLeft} minutes.`,
+                retryAfterSeconds: ttl,
             });
         }
         

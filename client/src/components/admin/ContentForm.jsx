@@ -2,7 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 
-const API_URL = 'http://localhost:5000/api/admin';
+import { API_BASE_URL } from '../../api/config.js';
+
+const API_URL = `${API_BASE_URL}/admin`;
 const CATEGORIES = ['syllabus', 'reference_video', 'notes', 'general_info'];
 
 const ContentForm = ({ showStatus, subjects }) => { // Subjects list is passed from Dashboard.jsx

@@ -14,7 +14,9 @@ const SearchBar = ({ onSearch }) => (
     </div>
 );
 
-const API_URL = 'http://localhost:5000/api/content';
+import { API_BASE_URL } from '../api/config.js';
+
+const API_URL = `${API_BASE_URL}/content`;
 
 const SubjectDetail = () => {
     const { id } = useParams();

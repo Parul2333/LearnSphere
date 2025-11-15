@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import { API_BASE_URL } from '../api/config.js';
 
 // Base API URL for public content structure
-const API_URL = 'http://localhost:5000/api/content'; 
+const API_URL = `${API_BASE_URL}/content`; 
 
 const YearSelection = () => {
     const { branchId } = useParams();
@@ -48,32 +49,22 @@ const YearSelection = () => {
 
     return (
         <div className="py-12 px-4 sm:px-6 lg:px-8">
-            <h1 className="text-4xl font-extrabold text-gray-900 text-center mb-4 tracking-tight">
-                {branchData.name} Curriculum
-            </h1>
-            <p className="text-center text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
-                Select your **Academic Year** to view subjects.
-            </p>
+            <div className="max-w-4xl mx-auto mb-6">
+                <button onClick={() => window.history.back()} className="text-indigo-600 hover:underline mb-4">← Back</button>
+                <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">{branchData.name} Curriculum</h1>
+                <p className="text-gray-600 dark:text-gray-300">Select your academic year to view subjects and content.</p>
+            </div>
 
             {/* Grid Container for Year Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-4xl mx-auto">
-                {availableYears.map((year, index) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+                {availableYears.map((year) => (
                     <Link
-                        // Link navigates to the SubjectList page, passing BOTH the Branch ID and Year Name
                         to={`/branch/${branchId}/year/${year}`} 
-                        key={year}
-                        className="block transition-all duration-300 transform hover:scale-[1.03] hover:shadow-xl rounded-xl"
+                        key={String(year)}
+                        className="block p-6 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition"
                     >
-                        <div 
-                            className={`p-8 h-full rounded-xl shadow-lg bg-white border-l-4 border-indigo-500 hover:bg-gray-50`}
-                        >
-                            <div className="text-5xl mb-4 text-center">
-                                {/* Display simple sequential number or icon */}
-                                {index + 1}
-                            </div>
-                            <h2 className="text-xl font-bold text-gray-800 text-center mt-4">
-                                {year}
-                            </h2>
+                        <div className="flex items-center justify-center h-24">
+                            <div className="text-2xl font-semibold">{year}</div>
                         </div>
                     </Link>
                 ))}

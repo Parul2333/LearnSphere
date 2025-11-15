@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api/auth';
+import { API_BASE_URL } from '../api/config.js';
+
+const API_URL = `${API_BASE_URL}/auth`;
 
 const Signup = () => {
     const [formData, setFormData] = useState({ username: '', email: '', password: '' });

@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 
-const API_URL = 'http://localhost:5000/api/admin';
+import { API_BASE_URL } from '../../api/config.js';
+
+const API_URL = `${API_BASE_URL}/admin`;
 
 const BranchYearManager = ({ showStatus }) => {
     const { token } = useAuth();

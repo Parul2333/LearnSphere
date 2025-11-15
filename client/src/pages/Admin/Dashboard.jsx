@@ -7,7 +7,9 @@ import ContentForm from '../../components/admin/ContentForm.jsx';
 // 🛠️ NEW COMPONENT IMPORT: For managing branches/years dynamically
 import BranchYearManager from '../../components/admin/BranchYearManager.jsx';
 
-const API_URL = 'http://localhost:5000/api';
+import { API_BASE_URL } from '../../api/config.js';
+
+const API_URL = API_BASE_URL;
 
 // Define the tabs for navigation, including the new structure manager
 const TABS = [

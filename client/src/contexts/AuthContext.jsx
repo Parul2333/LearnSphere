@@ -4,8 +4,13 @@ import axios from 'axios';
 // 1. Create the Context
 export const AuthContext = createContext();
 
-// Define the API base URL (assuming your backend runs on port 5000)
-const API_URL = 'http://localhost:5000/api/auth';
+// Define the API base URL (HTTPS on port 4430 for local dev with self-signed cert)
+const API_URL = 'https://localhost:4430/api/auth';
+
+// Configure axios to accept self-signed certificates in development
+if (process.env.NODE_ENV === 'development') {
+  axios.defaults.httpsAgent = { rejectUnauthorized: false };
+}
 
 // 2. Auth Provider Component
 export const AuthProvider = ({ children }) => {
@@ -35,9 +40,15 @@ export const AuthProvider = ({ children }) => {
             const { data } = await axios.get(`${API_URL}/me`);
             setUser(data);
         } catch (error) {
-            // Token is invalid, expired, or server failed to authenticate it
-            console.error('Token invalid or expired. Logging out.');
-            logout();
+            // If the token is invalid or expired, quietly clear it without noisy logs
+            const status = error?.response?.status;
+            if (status === 401 || status === 403) {
+                // clear token silently
+                logout();
+            } else {
+                // For other errors (network/db), log for debugging but don't repeatedly call logout
+                console.warn('Failed to load user on refresh:', error?.message || error);
+            }
         } finally {
             setLoading(false);
         }

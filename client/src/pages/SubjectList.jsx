@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import SubjectCard from '../components/subject/SubjectCard.jsx'; 
+import SubjectCard from '../components/subject/SubjectCard.jsx';
+import { API_BASE_URL } from '../api/config.js';
 
 // Base API URL for all public endpoints
-const API_URL = 'http://localhost:5000/api'; 
+const API_URL = `${API_BASE_URL}`; 
 
 const SubjectList = () => {
     // URL parameters: branchId and the display name of the year

@@ -6,13 +6,19 @@ import { useAuth } from './contexts/AuthContext.jsx';
 
 // --- Import Page Components ---
 import Home from './pages/Home.jsx';
+import Contact from './pages/Contact.jsx'; // 💡 NEW
+import Feedback from './pages/Feedback.jsx'; // 💡 NEW
 import SubjectList from './pages/SubjectList.jsx';
 import SubjectDetail from './pages/SubjectDetail.jsx';
+import Explore from './pages/Explore.jsx';
 import AdminDashboard from './pages/Admin/Dashboard.jsx';
+import Analytics from './pages/Admin/Analytics.jsx';
 import LoginForm from './components/auth/LoginForm.jsx'; 
 import Navbar from './components/common/Navbar.jsx';
+import Footer from './components/common/Footer.jsx'; // 💡 NEW
+import NotificationCenter from './components/common/NotificationCenter.jsx';
 import Signup from './pages/Signup.jsx'; 
-import YearSelection from './pages/YearSelection.jsx'; // 💡 NEW IMPORT
+import YearSelection from './pages/YearSelection.jsx';
 
 // --- Protected Route Components ---
 const AdminRoute = ({ element: Element }) => {
@@ -27,12 +33,18 @@ const AdminRoute = ({ element: Element }) => {
 const App = () => {
     return (
         <Router>
-            <div className="min-h-screen">
+            <div className="min-h-screen dark:bg-gray-900 flex flex-col">
                 <Navbar />
-                <main className="p-4 container mx-auto">
+                {/* 💡 NEW: Notification Center */}
+                <NotificationCenter />
+                <main className="p-4 container mx-auto flex-grow">
                     <Routes>
                         {/* Public Routes */}
                         <Route path="/" element={<Home />} />
+                        {/* About merged into Home; /about removed */}
+                        <Route path="/contact" element={<Contact />} /> {/* 💡 NEW */}
+                        <Route path="/feedback" element={<Feedback />} /> {/* 💡 NEW */}
+                        <Route path="/explore" element={<Explore />} />
                         <Route path="/login" element={<LoginForm />} />
                         <Route path="/signup" element={<Signup />} />
                         
@@ -47,11 +59,13 @@ const App = () => {
 
                         {/* Admin Routes (Secured) */}
                         <Route path="/admin/dashboard" element={<AdminRoute element={AdminDashboard} />} />
+                        <Route path="/admin/analytics" element={<AdminRoute element={Analytics} />} />
                         
                         {/* Fallback route for 404s */}
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </main>
+                <Footer /> {/* 💡 NEW */}
             </div>
         </Router>
     );

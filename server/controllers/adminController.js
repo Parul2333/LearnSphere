@@ -10,7 +10,29 @@ import redis from '../config/redis.js'; // Use redis for cache invalidation
 // @access  Private/Admin
 export const getAllBranches = async (req, res) => {
     try {
+        // Try to return cached branches if Redis is available
+        if (redis && redis.status === 'ready') {
+            try {
+                const cached = await redis.get('branches_cache');
+                if (cached) {
+                    return res.status(200).json(JSON.parse(cached));
+                }
+            } catch (e) {
+                console.warn('[Redis] failed to read branches cache:', e.message || e);
+            }
+        }
+
         const branches = await Branch.find().select('name years');
+
+        // Cache the branches for 30 minutes to reduce DB hits
+        if (redis && redis.status === 'ready') {
+            try {
+                await redis.set('branches_cache', JSON.stringify(branches), 'EX', 30 * 60);
+            } catch (e) {
+                console.warn('[Redis] failed to write branches cache:', e.message || e);
+            }
+        }
+
         res.status(200).json(branches);
     } catch (error) {
         res.status(500).json({ message: 'Server error fetching branches.', error: error.message });
@@ -26,9 +48,10 @@ export const createBranch = async (req, res) => {
     try {
         const branch = await Branch.create({ name, years });
         
-        // Invalidate cache for subject lists as structure changed
+        // Invalidate caches as structure changed
         if (redis && redis.status === 'ready') {
             await redis.del('all_subjects_cache');
+            await redis.del('branches_cache');
         }
 
         res.status(201).json(branch);
@@ -66,9 +89,10 @@ export const deleteBranch = async (req, res) => {
             return res.status(404).json({ message: 'Branch not found.' });
         }
         
-        // Invalidate cache for subject lists
+        // Invalidate caches for subject lists and branches
         if (redis && redis.status === 'ready') {
             await redis.del('all_subjects_cache');
+            await redis.del('branches_cache');
         }
 
         res.status(200).json({ 

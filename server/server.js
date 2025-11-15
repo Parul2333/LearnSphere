@@ -1,78 +1,88 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import http from 'http';
-import cors from 'cors';
-import { Server as socketio } from 'socket.io'; 
+import express from "express";
+import dotenv from "dotenv";
+import http from "http";
+import https from "https";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import cors from "cors";
+import { Server as socketio } from "socket.io"; 
 
-// --- Configuration Imports ---
-import connectDB from './config/db.js';
-import redis from './config/redis.js'; 
+import connectDB from "./config/db.js";
+import redis from "./config/redis.js"; 
+import mongoose from "mongoose";
 
-// --- Route Imports (ESM) ---
-import userRoutes from './routes/userRoutes.js';
-import adminRoutes from './routes/adminRoutes.js'; 
-import contentRoutes from './routes/contentRoutes.js'; 
-// 💡 NEW IMPORT: Website Access Counter Middleware
-import { incrementAccessCounter } from './controllers/siteController.js'; 
+import userRoutes from "./routes/userRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js"; 
+import contentRoutes from "./routes/contentRoutes.js";
+import searchRoutes from "./routes/searchRoutes.js";
+import analyticsRoutes from "./routes/analyticsRoutes.js";
+import { incrementAccessCounter } from "./controllers/siteController.js";
+import { setupNotificationEvents } from "./events/notificationEvents.js";
 
-// Load environment variables
-dotenv.config({ path: '../.env' });
-
-// Connect to Database
+dotenv.config({ path: "../.env" });
 connectDB();
 
 const app = express();
-const server = http.createServer(app);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// --- Initialize Socket.io ---
-const io = new socketio(server, {
-  cors: {
-    origin: '*', 
-    methods: ['GET', 'POST'],
-  },
-});
+let server, io;
 
-io.on('connection', (socket) => {
-  console.log('🔗 New Socket.io connection established');
-  socket.on('disconnect', () => {
-    console.log('Socket disconnected');
-  });
-});
-// --- End Socket.io Setup ---
+const initializeSocketIO = (httpServer) => {
+  const socketIO = new socketio(httpServer, { cors: { origin: "*", methods: ["GET", "POST"] } });
+  socketIO.on("connection", (socket) => {
+    console.log(" Socket.io connection");
+    socket.on("disconnect", () => console.log("Socket disconnected"));
+  });
+  setupNotificationEvents(socketIO);
+  return socketIO;
+};
 
-// 💡 NEW MIDDLEWARE: Apply counter middleware to all incoming public requests
-app.use(incrementAccessCounter); 
-
-// Middleware
+app.use(incrementAccessCounter);
 app.use(cors());
-app.use(express.json()); // Body parser
+app.use(express.json());
 
-// Simple Test Route
-app.get('/', (req, res) => {
-  res.send('API is running for LearnSphere...');
-});
-
-// --- Define Routes ---
-// 1. Authentication and User Profiles
-app.use('/api/auth', userRoutes); 
-
-// 2. Admin Content Management (Creating Subjects/Notes/Videos)
-app.use('/api/admin', adminRoutes); 
-
-// 3. Public/User Content Retrieval (Includes content/subjects and /content/branches)
-app.use('/api/content', contentRoutes); 
-
-// --- Error Handling Middleware (optional) ---
-// app.use(errorHandler);
-
-const PORT = process.env.PORT || 5000;
-
-// CRITICAL FIX: Prevent server from starting to listen during Jest tests
-if (process.env.NODE_ENV !== 'test') { 
-    server.listen(PORT, () => {
-        console.log(`\n🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-    });
+const clientDist = path.join(__dirname, "..", "client", "dist");
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get(/^\/(?!api).*/, (req, res) => res.sendFile(path.join(clientDist, "index.html")));
+} else {
+  app.get("/", (req, res) => res.send("API running..."));
 }
 
-// Export the app instance for Supertest
+app.get("/api/health", (req, res) => res.json({ mongodb: mongoose.connection?.readyState, redis: redis?.status }));
+
+app.use("/api/auth", userRoutes); 
+app.use("/api/admin", adminRoutes); 
+app.use("/api/content", contentRoutes);
+app.use("/api/search", searchRoutes);
+app.use("/api/admin/analytics", analyticsRoutes);
+
+const PORT = process.env.PORT || 5000;
+const HTTPS_PORT = process.env.HTTPS_PORT || 4430;
+
+if (process.env.NODE_ENV !== "test") { 
+    const certDir = path.join(__dirname, "certs");
+    const keyPath = path.join(certDir, "key.pem");
+    const certPath = path.join(certDir, "cert.pem");
+
+    try {
+        if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+            const key = fs.readFileSync(keyPath);
+            const cert = fs.readFileSync(certPath);
+            server = https.createServer({ key, cert }, app);
+            io = initializeSocketIO(server);
+            server.listen(HTTPS_PORT, () => console.log(`\n HTTPS: https://localhost:${HTTPS_PORT}`));
+        } else {
+            throw new Error("Certs not found");
+        }
+    } catch (e) {
+        console.warn("HTTPS failed:", e?.message);
+        server = http.createServer(app);
+        io = initializeSocketIO(server);
+        server.listen(PORT, () => console.log(`\n HTTP: http://localhost:${PORT}`));
+    }
+}
+
 export default app;

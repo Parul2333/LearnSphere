@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 // 💡 NEW IMPORTS: Rate Limiter functions
-import { trackFailedLogin, resetLoginAttempts } from "../middleware/rateLimiter.js";
+import { trackFailedLogin, resetLoginAttempts, LOCKOUT_TIME_SECONDS } from "../middleware/rateLimiter.js";
 import redis from "../config/redis.js";
 
 
@@ -93,8 +93,14 @@ export const loginUser = async (req, res) => {
                 token: token,
             });
         } else {
-            // 💡 FAILURE: Track failed attempt
-            await trackFailedLogin(email);
+            // 💡 FAILURE: Track failed attempt and detect lockout
+            const locked = await trackFailedLogin(email);
+
+            if (locked) {
+                // Client should be informed the account is locked for LOCKOUT_TIME_SECONDS
+                res.set('Retry-After', String(LOCKOUT_TIME_SECONDS));
+                return res.status(429).json({ message: `Account locked due to failed login attempts. Try again in ${Math.ceil(LOCKOUT_TIME_SECONDS/60)} minutes.` });
+            }
 
             return res.status(401).json({ message: "Invalid email or password" });
         }
