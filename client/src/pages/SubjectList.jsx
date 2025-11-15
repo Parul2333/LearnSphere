@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import SubjectCard from '../components/subject/SubjectCard.jsx';
 import { API_BASE_URL } from '../api/config.js';
+import { useNotifications } from '../contexts/NotificationContext.jsx';
 
 // Base API URL for all public endpoints
 const API_URL = `${API_BASE_URL}`; 
 
 const SubjectList = () => {
     // URL parameters: branchId and the display name of the year
-    const { branchId, yearName } = useParams(); 
+    const { branchId, yearName } = useParams();
+    const { joinBranch } = useNotifications();
     
     const [allSubjects, setAllSubjects] = useState([]); // All subjects fetched from DB
     const [branchName, setBranchName] = useState(''); // To display the branch name
@@ -46,6 +48,46 @@ const SubjectList = () => {
 
         fetchAllData();
     }, [branchId]); // Reruns if the Branch ID in the URL changes
+
+    // Join branch room for real-time notifications about new subjects
+    useEffect(() => {
+        if (branchId) {
+            console.log(`🔔 Joining branch room: ${branchId}`);
+            joinBranch(branchId);
+        }
+    }, [branchId, joinBranch]);
+
+    // Listen for new subject notifications and refresh the list
+    const { notifications } = useNotifications();
+    const processedNotifications = useRef(new Set());
+    
+    useEffect(() => {
+        // When a new subject notification is received, refresh the subject list
+        notifications.forEach(notification => {
+            // Skip if already processed
+            if (processedNotifications.current.has(notification.id)) {
+                return;
+            }
+            
+            // Check if it's a new_subject notification for this branch
+            if (notification.type === 'new_subject') {
+                const subjectData = notification.data;
+                // Check if the subject belongs to this branch (compare branch ID)
+                if (subjectData && subjectData.branch === branchId) {
+                    console.log('🔄 New subject detected for this branch, refreshing list...', subjectData);
+                    processedNotifications.current.add(notification.id);
+                    
+                    // Refresh the subject list
+                    axios.get(`${API_URL}/content/subjects`)
+                        .then(res => {
+                            setAllSubjects(res.data);
+                            console.log('✅ Subject list refreshed');
+                        })
+                        .catch(err => console.error('Error refreshing subjects:', err));
+                }
+            }
+        });
+    }, [notifications, branchId, API_URL]);
 
     // --- Filter Subjects based on URL parameters ---
     const subjectsForYear = useMemo(() => {
