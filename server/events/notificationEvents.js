@@ -71,14 +71,14 @@ export const notifyNewContent = (io, subjectId, contentData) => {
 };
 
 /**
-* Notify users subscribed to a branch about new subject
-*/
+ * Notify users subscribed to a branch about new subject
+ */
 export const notifyNewSubject = (io, branchId, subjectData) => {
     if (!io) {
         console.warn('[Socket] Cannot notify: Socket.io instance not available');
         return;
     }
-   
+    
     try {
         const room = `branch_${branchId}`;
         const notification = {
@@ -86,23 +86,23 @@ export const notifyNewSubject = (io, branchId, subjectData) => {
             subject: subjectData,
             timestamp: new Date().toISOString(),
         };
-       
+        
         io.to(room).emit('new_subject', notification);
         console.log(`📢 Notified room "${room}" about new subject: ${subjectData.name}`);
     } catch (error) {
         console.error('[Socket] Error notifying new subject:', error);
     }
- };
- 
-  /**
-* Notify users about subject progress update
-*/
+};
+
+/**
+ * Notify users about subject progress update
+ */
 export const notifyProgressUpdate = (io, subjectId, percentage) => {
     if (!io) {
         console.warn('[Socket] Cannot notify: Socket.io instance not available');
         return;
     }
-   
+    
     try {
         const room = `subject_${subjectId}`;
         const notification = {
@@ -110,10 +110,34 @@ export const notifyProgressUpdate = (io, subjectId, percentage) => {
             percentage,
             timestamp: new Date().toISOString(),
         };
-       
+        
         io.to(room).emit('progress_update', notification);
         console.log(`📢 Notified room "${room}" about progress update: ${percentage}%`);
     } catch (error) {
         console.error('[Socket] Error notifying progress update:', error);
     }
- };
+};
+
+/**
+ * Send admin broadcast message
+ */
+export const notifyAdminBroadcast = (io, adminId, message, data = {}) => {
+    if (!io) {
+        console.warn('[Socket] Cannot notify: Socket.io instance not available');
+        return;
+    }
+    
+    try {
+        const room = `admin_${adminId}`;
+        const notification = {
+            message,
+            data,
+            timestamp: new Date().toISOString(),
+        };
+        
+        io.to(room).emit('admin_message', notification);
+        console.log(`📢 Notified admin room "${room}": ${message}`);
+    } catch (error) {
+        console.error('[Socket] Error notifying admin:', error);
+    }
+};
