@@ -1,4 +1,4 @@
-// client/src/components/common/NotificationCenter.jsx
+
 
 import React, { useEffect, useState } from 'react';
 import { useNotifications } from '../../contexts/NotificationContext.jsx';
@@ -6,12 +6,8 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 
 const NotificationCenter = () => {
     const { notifications, removeNotification } = useNotifications();
-    const { user } = useAuth(); // Get user from auth context
-    
-    // 🔥 IMPORTANT: Keep notifPrefs ONLY in component state - NOT in sessionStorage
-    // This ensures each session is completely fresh and doesn't persist data
+    const { user } = useAuth(); 
     const [notifPrefs, setNotifPrefs] = useState(() => {
-        // If user is logged in, initialize with fresh defaults
         if (user) {
             return {
                 enabled: true,
@@ -23,12 +19,9 @@ const NotificationCenter = () => {
                 desktop: false,
             };
         }
-        
-        // If no user logged in, return empty
         return {};
     });
 
-    // 🔥 Reset preferences when user changes (login/logout)
     useEffect(() => {
         if (user) {
             setNotifPrefs({
@@ -43,9 +36,8 @@ const NotificationCenter = () => {
         } else {
             setNotifPrefs({});
         }
-    }, [user]); // Reset when user changes
-
-    // 🔥 Handler for updating preferences (in-memory only, not persisted)
+    }, [user]); 
+    
     const updateNotificationPreference = (key, value) => {
         setNotifPrefs(prev => ({
             ...prev,
