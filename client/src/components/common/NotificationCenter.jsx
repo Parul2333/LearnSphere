@@ -1,10 +1,49 @@
-// client/src/components/common/NotificationCenter.jsx
 
-import React from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { useNotifications } from '../../contexts/NotificationContext.jsx';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 
 const NotificationCenter = () => {
     const { notifications, removeNotification } = useNotifications();
+    const { user } = useAuth(); 
+    const [notifPrefs, setNotifPrefs] = useState(() => {
+        if (user) {
+            return {
+                enabled: true,
+                newContent: true,
+                newSubject: true,
+                progressUpdate: true,
+                adminMessage: true,
+                sound: true,
+                desktop: false,
+            };
+        }
+        return {};
+    });
+
+    useEffect(() => {
+        if (user) {
+            setNotifPrefs({
+                enabled: true,
+                newContent: true,
+                newSubject: true,
+                progressUpdate: true,
+                adminMessage: true,
+                sound: true,
+                desktop: false,
+            });
+        } else {
+            setNotifPrefs({});
+        }
+    }, [user]); 
+    
+    const updateNotificationPreference = (key, value) => {
+        setNotifPrefs(prev => ({
+            ...prev,
+            [key]: value,
+        }));
+    };
 
     const getNotificationIcon = (type) => {
         switch (type) {

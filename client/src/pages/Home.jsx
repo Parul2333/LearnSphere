@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext.jsx';
+import { LocalStorage } from '../utils/storageManager.js';
 
 // ✅ CRITICAL FIX: Use HTTPS API URL with self-signed cert bypass
 const API_URL = 'https://localhost:4430/api/content';

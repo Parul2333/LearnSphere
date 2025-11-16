@@ -4,6 +4,7 @@ import axios from 'axios';
 import SubjectCard from '../components/subject/SubjectCard.jsx';
 import { API_BASE_URL } from '../api/config.js';
 import { useNotifications } from '../contexts/NotificationContext.jsx';
+import { LocalStorage, SessionStorage } from '../utils/storageManager.js';
 
 // Base API URL for all public endpoints
 const API_URL = `${API_BASE_URL}`; 
@@ -34,6 +35,8 @@ const SubjectList = () => {
                 
                 if (currentBranch) {
                     setBranchName(currentBranch.name);
+                    // 🔥 STORE branch name in localStorage
+                    LocalStorage.setSelectedBranch(currentBranch.name);
                 } else {
                     setError("Branch structure not found.");
                 }
@@ -99,6 +102,24 @@ const SubjectList = () => {
         );
     }, [allSubjects, branchId, yearName]); // Depend on branchId and yearName from URL
 
+    // 🔥 SAVE and RESTORE scroll position
+    useEffect(() => {
+        const currentPath = `/branch/${branchId}/year/${yearName}`;
+        
+        // Restore scroll position on mount
+        const savedPosition = SessionStorage.getScrollPosition(currentPath);
+        if (savedPosition) {
+            window.scrollTo(0, savedPosition);
+        }
+
+        // Save scroll position on scroll event
+        const handleScroll = () => {
+            SessionStorage.setScrollPosition(currentPath, window.scrollY);
+        };
+
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [branchId, yearName]);
 
     if (loading) {
         return <div className="text-center p-12 text-xl text-indigo-600">Loading subjects for {yearName}...</div>;

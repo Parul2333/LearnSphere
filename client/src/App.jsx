@@ -1,8 +1,9 @@
 // client/src/App.jsx
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext.jsx'; 
+import useStorageInitialization from './hooks/useStorageInitialization.js';
 
 // --- Import Page Components ---
 import Home from './pages/Home.jsx';
@@ -31,6 +32,9 @@ const AdminRoute = ({ element: Element }) => {
 };
 
 const App = () => {
+    // 🔥 Initialize all storage items on app load
+    useStorageInitialization();
+
     return (
         <Router>
             <div className="min-h-screen dark:bg-gray-900 flex flex-col">

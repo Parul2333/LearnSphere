@@ -1,10 +1,9 @@
-// client/src/components/common/SearchBar.jsx
-
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 import { API_BASE_URL } from '../../api/config.js';
+import { SessionStorage } from '../../utils/storageManager.js';
 
 const API_URL = `${API_BASE_URL}/search`;
 
@@ -17,10 +16,17 @@ const SearchBar = () => {
     const suggestionsRef = useRef(null);
     const navigate = useNavigate();
 
-    // Fetch suggestions as user types
+
+    useEffect(() => {
+        const history = SessionStorage.getSessionSearchHistory();
+        setSuggestions(history);
+    }, []);
+
     useEffect(() => {
         if (query.length < 1) {
-            setSuggestions([]);
+           
+            const history = SessionStorage.getSessionSearchHistory();
+            setSuggestions(history);
             return;
         }
 
@@ -36,7 +42,6 @@ const SearchBar = () => {
         return () => clearTimeout(timer);
     }, [query]);
 
-    // Close suggestions when clicking outside
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (suggestionsRef.current && !suggestionsRef.current.contains(e.target)) {
@@ -52,6 +57,15 @@ const SearchBar = () => {
         if (searchQuery.trim().length < 2) {
             alert('Please enter at least 2 characters.');
             return;
+        }
+
+        const history = SessionStorage.getSessionSearchHistory();
+        if (!history.includes(searchQuery)) {
+            history.push(searchQuery);
+            if (history.length > 10) {
+                history.shift();
+            }
+            SessionStorage.setSessionSearchHistory(history);
         }
 
         setLoading(true);
