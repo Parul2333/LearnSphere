@@ -56,7 +56,6 @@ export const NotificationProvider = ({ children }) => {
             console.error('❌ WebSocket reconnection failed after all attempts');
         });
 
-        // Listen for different notification types
         newSocket.on('new_content', (data) => {
             addNotification({
                 id: Date.now(),
