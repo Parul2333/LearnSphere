@@ -2,6 +2,8 @@ import Subject from '../models/Subject.js';
 import Content from '../models/Content.js';
 import Branch from '../models/Branch.js'; // 💡 NEW: Import the Branch model
 import redis from '../config/redis.js'; // Use redis for cache invalidation
+import { getSocketIO } from '../utils/socket.js';
+import { notifyNewContent, notifyNewSubject, notifyProgressUpdate } from '../events/notificationEvents.js';
 
 // --- Helper Functions for Branch Management (CRUD) ---
 
@@ -125,6 +127,23 @@ export const createSubject = async (req, res) => {
             await redis.del('all_subjects_cache'); 
         }
 
+        // Emit WebSocket notification for new subject
+        const io = getSocketIO();
+        if (io) {
+            try {
+                const branch = await Branch.findById(branchId);
+                notifyNewSubject(io, branchId, {
+                    _id: subject._id,
+                    name: subject.name,
+                    year: subject.year,
+                    branch: branchId, // Send branch ID for matching
+                    branchName: branch?.name || 'Unknown Branch' // Include name for display
+                });
+            } catch (notifyError) {
+                console.warn('[Socket] Failed to notify new subject:', notifyError.message);
+            }
+        }
+
         res.status(201).json(subject);
 
     } catch (error) {
@@ -160,6 +179,21 @@ export const addContentToSubject = async (req, res) => {
             await redis.del(`subject_content_${subjectId}`);
         }
 
+        // Emit WebSocket notification for new content
+        const io = getSocketIO();
+        if (io) {
+            try {
+                notifyNewContent(io, subjectId, {
+                    _id: content._id,
+                    title: content.title,
+                    category: content.category,
+                    link: content.link
+                });
+            } catch (notifyError) {
+                console.warn('[Socket] Failed to notify new content:', notifyError.message);
+            }
+        }
+
         res.status(201).json(content);
 
     } catch (error) {
@@ -192,6 +226,16 @@ export const updateSubjectProgress = async (req, res) => {
         // CRITICAL FIX: Check if Redis is ready before calling .del()
         if (redis && redis.status === 'ready') {
             await redis.del(`subject_${id}_cache`); 
+        }
+
+        // Emit WebSocket notification for progress update
+        const io = getSocketIO();
+        if (io) {
+            try {
+                notifyProgressUpdate(io, id, percentage);
+            } catch (notifyError) {
+                console.warn('[Socket] Failed to notify progress update:', notifyError.message);
+            }
         }
 
         res.json(subject);

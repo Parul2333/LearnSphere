@@ -10,22 +10,50 @@ export const NotificationProvider = ({ children }) => {
     const [socket, setSocket] = useState(null);
 
     useEffect(() => {
-        // Initialize Socket.io connection (HTTPS on port 4430 with dev cert bypass)
-        const newSocket = io('https://localhost:4430', {
+        // Determine server URL based on current protocol
+        // In development, try HTTPS first (4430), fallback to HTTP (5000)
+        const isHttps = window.location.protocol === 'https:';
+        const serverPort = isHttps ? 4430 : 5000;
+        const serverUrl = `${window.location.protocol}//${window.location.hostname}:${serverPort}`;
+        
+        console.log(`🔌 Connecting to WebSocket server: ${serverUrl}`);
+        console.log(`🔒 Protocol: ${window.location.protocol}, Port: ${serverPort}`);
+        
+        // Initialize Socket.io connection
+        const newSocket = io(serverUrl, {
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
-            reconnectionAttempts: 5,
-            secure: true,
-            rejectUnauthorized: false, // Accept self-signed cert in dev
+            reconnectionAttempts: Infinity, // Keep trying to reconnect
+            transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
+            secure: isHttps,
+            rejectUnauthorized: false, // Accept self-signed cert in dev (required for localhost HTTPS)
+            timeout: 20000, // 20 second connection timeout
+            forceNew: false, // Reuse existing connection if available
         });
 
         newSocket.on('connect', () => {
-            console.log('✅ Connected to notification server');
+            console.log('✅ Connected to WebSocket notification server');
         });
 
-        newSocket.on('disconnect', () => {
-            console.log('❌ Disconnected from notification server');
+        newSocket.on('disconnect', (reason) => {
+            console.log('❌ Disconnected from notification server:', reason);
+        });
+
+        newSocket.on('connect_error', (error) => {
+            console.error('❌ WebSocket connection error:', error.message);
+        });
+
+        newSocket.on('reconnect', (attemptNumber) => {
+            console.log(`🔄 Reconnected to WebSocket server (attempt ${attemptNumber})`);
+        });
+
+        newSocket.on('reconnect_error', (error) => {
+            console.error('❌ WebSocket reconnection error:', error.message);
+        });
+
+        newSocket.on('reconnect_failed', () => {
+            console.error('❌ WebSocket reconnection failed after all attempts');
         });
 
         // Listen for different notification types

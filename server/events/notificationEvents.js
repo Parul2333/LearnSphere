@@ -46,34 +46,98 @@ export const setupNotificationEvents = (io) => {
 
 // Notification emission functions (called from controllers)
 
+/**
+ * Notify users subscribed to a subject about new content
+ */
 export const notifyNewContent = (io, subjectId, contentData) => {
-    io.to(`subject_${subjectId}`).emit('new_content', {
-        message: `New ${contentData.category} added: ${contentData.title}`,
-        content: contentData,
-        timestamp: new Date(),
-    });
+    if (!io) {
+        console.warn('[Socket] Cannot notify: Socket.io instance not available');
+        return;
+    }
+    
+    try {
+        const room = `subject_${subjectId}`;
+        const notification = {
+            message: `New ${contentData.category} added: ${contentData.title}`,
+            content: contentData,
+            timestamp: new Date().toISOString(),
+        };
+        
+        io.to(room).emit('new_content', notification);
+        console.log(`📢 Notified room "${room}" about new content: ${contentData.title}`);
+    } catch (error) {
+        console.error('[Socket] Error notifying new content:', error);
+    }
 };
 
+/**
+ * Notify users subscribed to a branch about new subject
+ */
 export const notifyNewSubject = (io, branchId, subjectData) => {
-    io.to(`branch_${branchId}`).emit('new_subject', {
-        message: `New subject created: ${subjectData.name}`,
-        subject: subjectData,
-        timestamp: new Date(),
-    });
+    if (!io) {
+        console.warn('[Socket] Cannot notify: Socket.io instance not available');
+        return;
+    }
+    
+    try {
+        const room = `branch_${branchId}`;
+        const notification = {
+            message: `New subject created: ${subjectData.name}`,
+            subject: subjectData,
+            timestamp: new Date().toISOString(),
+        };
+        
+        io.to(room).emit('new_subject', notification);
+        console.log(`📢 Notified room "${room}" about new subject: ${subjectData.name}`);
+    } catch (error) {
+        console.error('[Socket] Error notifying new subject:', error);
+    }
 };
 
+/**
+ * Notify users about subject progress update
+ */
 export const notifyProgressUpdate = (io, subjectId, percentage) => {
-    io.to(`subject_${subjectId}`).emit('progress_update', {
-        message: `Subject completion updated to ${percentage}%`,
-        percentage,
-        timestamp: new Date(),
-    });
+    if (!io) {
+        console.warn('[Socket] Cannot notify: Socket.io instance not available');
+        return;
+    }
+    
+    try {
+        const room = `subject_${subjectId}`;
+        const notification = {
+            message: `Subject completion updated to ${percentage}%`,
+            percentage,
+            timestamp: new Date().toISOString(),
+        };
+        
+        io.to(room).emit('progress_update', notification);
+        console.log(`📢 Notified room "${room}" about progress update: ${percentage}%`);
+    } catch (error) {
+        console.error('[Socket] Error notifying progress update:', error);
+    }
 };
 
+/**
+ * Send admin broadcast message
+ */
 export const notifyAdminBroadcast = (io, adminId, message, data = {}) => {
-    io.to(`admin_${adminId}`).emit('admin_message', {
-        message,
-        data,
-        timestamp: new Date(),
-    });
+    if (!io) {
+        console.warn('[Socket] Cannot notify: Socket.io instance not available');
+        return;
+    }
+    
+    try {
+        const room = `admin_${adminId}`;
+        const notification = {
+            message,
+            data,
+            timestamp: new Date().toISOString(),
+        };
+        
+        io.to(room).emit('admin_message', notification);
+        console.log(`📢 Notified admin room "${room}": ${message}`);
+    } catch (error) {
+        console.error('[Socket] Error notifying admin:', error);
+    }
 };

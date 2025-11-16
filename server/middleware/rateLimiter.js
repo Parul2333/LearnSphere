@@ -8,6 +8,7 @@ export const LOCKOUT_TIME_SECONDS = 30 * 60; // 30 minutes
 
 // Helper to construct the key in Redis (use email to identify the user)
 const getKey = (email) => `login_fail:${email.toLowerCase()}`;
+const getAttemptLogKey = (email) => `login_attempts:${email.toLowerCase()}`;
 
 /**
  * Middleware to check if the user is currently locked out.
@@ -25,7 +26,7 @@ export const checkLockout = async (req, res, next) => {
 
     try {
         // Check the remaining time on the key
-        const ttl = await redis.ttl(key); 
+        const ttl = await redis.ttl(key);
 
         // If TTL is positive, the key exists and the user is locked out
         if (ttl > 0) {
@@ -37,7 +38,7 @@ export const checkLockout = async (req, res, next) => {
                 retryAfterSeconds: ttl,
             });
         }
-        
+
         // User is not locked out, proceed to login
         next();
     } catch (error) {
@@ -50,20 +51,40 @@ export const checkLockout = async (req, res, next) => {
 /**
  * Tracks a failed login attempt and locks the account if MAX_ATTEMPTS is reached.
  * Called AFTER a failed login attempt in the user controller.
+ * 
+ * @param {string} email - User email
+ * @param {object} metadata - Optional metadata (ip, userAgent, etc.)
+ * @returns {Promise<boolean>} - Returns true if account is locked
  */
-export const trackFailedLogin = async (email) => {
-    if (!redis || redis.status !== 'ready') return;
+export const trackFailedLogin = async (email, metadata = {}) => {
+    if (!redis || redis.status !== 'ready') return false;
 
     const key = getKey(email);
+    const logKey = getAttemptLogKey(email);
 
     try {
-        // INCRBY increments the failure count atomically
+        // INCR increments the failure count automaticaly
         const attempts = await redis.incr(key);
+
+        // Store detailed attempt log for security auditing
+        const attemptData = {
+            email: email.toLowerCase(),
+            success: false,
+            timestamp: new Date().toISOString(),
+            ip: metadata.ip || 'unknown',
+            userAgent: metadata.userAgent || 'unknown',
+            attempts: attempts
+        };
+
+        // Store attempt in a list (keep last 20 attempts per user)
+        await redis.lpush(logKey, JSON.stringify(attemptData));
+        await redis.ltrim(logKey, 0, 19); // Keep only last 20 attempts
+        await redis.expire(logKey, 24 * 60 * 60); // Expire after 24 hours
 
         if (attempts === 1) {
             // If this is the first failure, set the expiration window (e.g., 30 minutes)
             // If the user logs in successfully before this expires, the key is deleted.
-            await redis.expire(key, LOCKOUT_TIME_SECONDS); 
+            await redis.expire(key, LOCKOUT_TIME_SECONDS);
         }
 
         if (attempts >= MAX_LOGIN_ATTEMPTS) {
@@ -83,14 +104,69 @@ export const trackFailedLogin = async (email) => {
 };
 
 /**
- * Resets the failed login counter on successful login.
- * Called on successful login in the user controller.
+ * Tracks a successful login attempt (for auditing purposes).
+ * 
+ * @param {string} email - User email
+ * @param {object} metadata - Optional metadata (ip, userAgent, etc.)
  */
+export const trackSuccessfulLogin = async (email, metadata = {}) => {
+    if (!redis || redis.status !== 'ready') return;
+
+    const logKey = getAttemptLogKey(email);
+
+    try {
+        const attemptData = {
+            email: email.toLowerCase(),
+            success: true,
+            timestamp: new Date().toISOString(),
+            ip: metadata.ip || 'unknown',
+            userAgent: metadata.userAgent || 'unknown'
+        };
+
+        // Store successful attempt in log
+        await redis.lpush(logKey, JSON.stringify(attemptData));
+        await redis.ltrim(logKey, 0, 19); // Keep only last 20 attempts
+        await redis.expire(logKey, 24 * 60 * 60); // Expire after 24 hours
+    } catch (error) {
+        console.error('[Redis Error] Failed to track successful login:', error);
+    }
+};
+
+/**
+* Retrieves login attempt history for a user (admin/security purposes).
+*
+* @param {string} email - User email
+* @returns {Promise<Array>} - Array of login attempts (most recent first)
+*/
+export const getLoginAttemptHistory = async (email) => {
+    if (!redis || redis.status !== 'ready') return [];
+
+
+    const logKey = getAttemptLogKey(email);
+
+
+    try {
+        const attempts = await redis.lrange(logKey, 0, -1); // Get all attempts
+        return attempts.map(attempt => JSON.parse(attempt));
+    } catch (error) {
+        console.error('[Redis Error] Failed to get login history:', error);
+        return [];
+    }
+};
+
+
+/**
+* Resets the failed login counter on successful login.
+* Called on successful login in the user controller.
+* Note: This does NOT delete the attempt history (login_attempts key),
+* only the failure counter (login_fail key).
+*/
 export const resetLoginAttempts = async (email) => {
     if (!redis || redis.status !== 'ready') return;
     const key = getKey(email);
     try {
         await redis.del(key);
+        // Note: We keep login_attempts history for auditing
     } catch (error) {
         console.error('[Redis Error] Failed to reset login attempts:', error);
     }

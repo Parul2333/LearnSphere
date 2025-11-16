@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 // 💡 NEW IMPORTS: Rate Limiter functions
-import { trackFailedLogin, resetLoginAttempts, LOCKOUT_TIME_SECONDS } from "../middleware/rateLimiter.js";
+import { trackFailedLogin, trackSuccessfulLogin, resetLoginAttempts, LOCKOUT_TIME_SECONDS } from "../middleware/rateLimiter.js";
 import redis from "../config/redis.js";
 
 
@@ -73,8 +73,14 @@ export const loginUser = async (req, res) => {
 
         if (user && (await bcrypt.compare(password, user.password))) {
             
-            // 💡 SUCCESS: Reset failure count
-            await resetLoginAttempts(email); 
+            // 💡 SUCCESS: Reset failure count and track successful login
+            await resetLoginAttempts(email);
+            
+            // Track successful login with metadata for auditing
+            await trackSuccessfulLogin(email, {
+                ip: req.ip || req.connection?.remoteAddress,
+                userAgent: req.get('user-agent')
+            });
 
             const token = generateToken(user._id, user.role, rememberMe);
 
@@ -93,8 +99,11 @@ export const loginUser = async (req, res) => {
                 token: token,
             });
         } else {
-            // 💡 FAILURE: Track failed attempt and detect lockout
-            const locked = await trackFailedLogin(email);
+            // 💡 FAILURE: Track failed attempt with metadata and detect lockout
+            const locked = await trackFailedLogin(email, {
+                ip: req.ip || req.connection?.remoteAddress,
+                userAgent: req.get('user-agent')
+            });
 
             if (locked) {
                 // Client should be informed the account is locked for LOCKOUT_TIME_SECONDS

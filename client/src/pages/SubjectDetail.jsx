@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import ContentViewer from '../components/subject/ContentViewer.jsx'; 
+import ContentViewer from '../components/subject/ContentViewer.jsx';
+import { useNotifications } from '../contexts/NotificationContext.jsx'; 
 // Assuming a SearchBar component will be created
 const SearchBar = ({ onSearch }) => (
     <div className="mb-8">
@@ -20,6 +21,7 @@ const API_URL = `${API_BASE_URL}/content`;
 
 const SubjectDetail = () => {
     const { id } = useParams();
+    const { joinSubject, leaveSubject } = useNotifications();
     
     const [subject, setSubject] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -41,6 +43,48 @@ const SubjectDetail = () => {
         };
         fetchContent();
     }, [id]);
+
+    // Join subject room for real-time notifications
+    useEffect(() => {
+        if (id) {
+            console.log(`🔔 Joining subject room: ${id}`);
+            joinSubject(id);
+            
+            // Cleanup: Leave room when component unmounts
+            return () => {
+                console.log(`🔔 Leaving subject room: ${id}`);
+                leaveSubject(id);
+            };
+        }
+    }, [id, joinSubject, leaveSubject]);
+
+    // Listen for new content notifications and refresh the subject data
+    const { notifications } = useNotifications();
+    const processedNotifications = useRef(new Set());
+    
+    useEffect(() => {
+        // When a new content notification is received, refresh the subject
+        notifications.forEach(notification => {
+            // Skip if already processed
+            if (processedNotifications.current.has(notification.id)) {
+                return;
+            }
+            
+            // Check if it's a new_content notification
+            if (notification.type === 'new_content' && notification.data?.content) {
+                console.log('🔄 New content detected, refreshing subject...', notification.data);
+                processedNotifications.current.add(notification.id);
+                
+                // Refresh the subject data
+                axios.get(`${API_URL}/subject/${id}`)
+                    .then(res => {
+                        setSubject(res.data);
+                        console.log('✅ Subject refreshed with new content');
+                    })
+                    .catch(err => console.error('Error refreshing subject:', err));
+            }
+        });
+    }, [notifications, id, API_URL]);
 
     // Function to group content items by category
     const groupedContent = useMemo(() => {

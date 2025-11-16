@@ -19,6 +19,7 @@ import searchRoutes from "./routes/searchRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import { incrementAccessCounter } from "./controllers/siteController.js";
 import { setupNotificationEvents } from "./events/notificationEvents.js";
+import { setSocketIO } from "./utils/socket.js";
 
 dotenv.config({ path: "../.env" });
 connectDB();
@@ -30,12 +31,24 @@ const __dirname = path.dirname(__filename);
 let server, io;
 
 const initializeSocketIO = (httpServer) => {
-  const socketIO = new socketio(httpServer, { cors: { origin: "*", methods: ["GET", "POST"] } });
-  socketIO.on("connection", (socket) => {
-    console.log(" Socket.io connection");
-    socket.on("disconnect", () => console.log("Socket disconnected"));
+  const socketIO = new socketio(httpServer, { 
+    cors: { 
+      origin: process.env.CLIENT_URL || "*", 
+      methods: ["GET", "POST"],
+      credentials: true
+    },
+    transports: ['websocket', 'polling'], // Support both transports
+    allowEIO3: true // Backward compatibility
   });
+  
+  // Setup notification event handlers (removed duplicate connection handler)
   setupNotificationEvents(socketIO);
+  
+  // Global connection logging
+  socketIO.on("connection", (socket) => {
+    console.log(`🔗 Socket.io client connected: ${socket.id}`);
+  });
+  
   return socketIO;
 };
 
@@ -73,7 +86,11 @@ if (process.env.NODE_ENV !== "test") {
             const cert = fs.readFileSync(certPath);
             server = https.createServer({ key, cert }, app);
             io = initializeSocketIO(server);
-            server.listen(HTTPS_PORT, () => console.log(`\n HTTPS: https://localhost:${HTTPS_PORT}`));
+            setSocketIO(io); // Make io instance available to controllers
+            server.listen(HTTPS_PORT, () => {
+                console.log(`\n✅ HTTPS Server: https://localhost:${HTTPS_PORT}`);
+                console.log(`✅ WebSocket Server: wss://localhost:${HTTPS_PORT}`);
+            });
         } else {
             throw new Error("Certs not found");
         }
@@ -81,8 +98,15 @@ if (process.env.NODE_ENV !== "test") {
         console.warn("HTTPS failed:", e?.message);
         server = http.createServer(app);
         io = initializeSocketIO(server);
-        server.listen(PORT, () => console.log(`\n HTTP: http://localhost:${PORT}`));
+        setSocketIO(io); // Make io instance available to controllers
+        server.listen(PORT, () => {
+            console.log(`\n✅ HTTP Server: http://localhost:${PORT}`);
+            console.log(`✅ WebSocket Server: ws://localhost:${PORT}`);
+        });
     }
 }
+
+// Export io instance for use in controllers
+export { io };
 
 export default app;
