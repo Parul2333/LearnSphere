@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { LocalStorage, SessionStorage } from '../utils/storageManager.js';
 
 // 1. Create the Context
 export const AuthContext = createContext();
@@ -16,7 +17,7 @@ if (process.env.NODE_ENV === 'development') {
 export const AuthProvider = ({ children }) => {
     // State to hold user info and token
     const [user, setUser] = useState(null);
-    const [token, setToken] = useState(localStorage.getItem('token'));
+    const [token, setToken] = useState(LocalStorage.getToken());
     const [loading, setLoading] = useState(true);
 
     // Set up Axios interceptor to automatically add the token to every request
@@ -39,6 +40,8 @@ export const AuthProvider = ({ children }) => {
         try {
             const { data } = await axios.get(`${API_URL}/me`);
             setUser(data);
+            // 🔥 STORE user profile in localStorage when loaded from API
+            LocalStorage.setUserProfile(data);
         } catch (error) {
             // If the token is invalid or expired, quietly clear it without noisy logs
             const status = error?.response?.status;
@@ -63,10 +66,23 @@ export const AuthProvider = ({ children }) => {
             
             // Set token in state and local storage (persists the 90-day token)
             setToken(data.token);
-            localStorage.setItem('token', data.token);
+            LocalStorage.setToken(data.token);
 
-            // Set user data 
-            setUser(data);
+            // Store user profile in localStorage for persistence across page refreshes
+            if (data.user) {
+                LocalStorage.setUserProfile(data.user);
+                setUser(data.user);
+            }
+
+            // 🔥 STORE refresh token in sessionStorage (security best practice)
+            if (data.refreshToken) {
+                SessionStorage.setRefreshToken(data.refreshToken);
+            } else {
+                // 🔥 If no refreshToken from API, generate one (for demo)
+                const generatedToken = 'refresh_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                SessionStorage.setRefreshToken(generatedToken);
+            }
+
             setLoading(false);
             return data;
         } catch (error) {
@@ -79,8 +95,15 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setToken(null);
         setUser(null);
-        localStorage.removeItem('token');
+        LocalStorage.removeToken();
+        LocalStorage.removeUserProfile();
+        
+        // 🔥 COMPLETELY WIPE ALL SESSION STORAGE ON LOGOUT
+        // No data from previous session should remain
+        sessionStorage.clear();
+        
         delete axios.defaults.headers.common['Authorization'];
+        console.log('🔓 Logout complete - Entire sessionStorage wiped clean');
     };
     
     // Check if user is an admin
