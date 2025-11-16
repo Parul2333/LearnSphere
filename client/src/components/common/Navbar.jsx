@@ -1,16 +1,23 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useTheme } from '../../contexts/ThemeContext.jsx'; // 💡 NEW
 import SearchBar from './SearchBar.jsx'; // 💡 NEW
 import ThemeToggle from './ThemeToggle.jsx'; // 💡 NEW
+import { LocalStorage } from '../../utils/storageManager.js';
 
 const Navbar = () => {
     const { user, logout, isAdmin } = useAuth();
     const { isDarkMode } = useTheme();
     const navigate = useNavigate();
+    const location = useLocation();
     const [showSearchModal, setShowSearchModal] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+    // 🔥 STORE current page as last visited page
+    useEffect(() => {
+        LocalStorage.setLastVisitedPage(location.pathname);
+    }, [location.pathname]);
 
     const handleLogout = () => {
         logout();
