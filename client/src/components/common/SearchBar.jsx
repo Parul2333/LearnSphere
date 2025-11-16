@@ -1,5 +1,3 @@
-// client/src/components/common/SearchBar.jsx
-
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -18,16 +16,14 @@ const SearchBar = () => {
     const suggestionsRef = useRef(null);
     const navigate = useNavigate();
 
-    // Load search history from sessionStorage on mount
+
     useEffect(() => {
         const history = SessionStorage.getSessionSearchHistory();
         setSuggestions(history);
     }, []);
 
-    // Fetch suggestions as user types
     useEffect(() => {
         if (query.length < 1) {
-            // Show history if available
             const history = SessionStorage.getSessionSearchHistory();
             setSuggestions(history);
             return;
@@ -40,12 +36,11 @@ const SearchBar = () => {
             } catch (error) {
                 console.error('Suggestions error:', error);
             }
-        }, 300); // Debounce
+        }, 300); 
 
         return () => clearTimeout(timer);
     }, [query]);
 
-    // Close suggestions when clicking outside
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (suggestionsRef.current && !suggestionsRef.current.contains(e.target)) {
@@ -63,11 +58,9 @@ const SearchBar = () => {
             return;
         }
 
-        // 🔥 STORE search query in sessionStorage
         const history = SessionStorage.getSessionSearchHistory();
         if (!history.includes(searchQuery)) {
             history.push(searchQuery);
-            // Limit to 10 items
             if (history.length > 10) {
                 history.shift();
             }
