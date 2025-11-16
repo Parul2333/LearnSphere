@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 const LoginForm = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [rememberMe, setRememberMe] = useState(false); // 💡 NEW: State for "Remember Me"
+    const [rememberMe, setRememberMe] = useState(false); 
     const [error, setError] = useState(null);
     
     const { login, loading } = useAuth();
@@ -16,17 +16,13 @@ const LoginForm = () => {
         setError(null);
         
         try {
-            // 💡 CRITICAL: Pass rememberMe flag to the login function
             const user = await login(email, password, rememberMe); 
-            
-            // Redirect based on role after successful login
             if (user.role === 'admin') {
                 navigate('/admin/dashboard');
             } else {
                 navigate('/');
             }
         } catch (err) {
-            // This catches security/rate limiting errors (403/401) and general login failure
             const message = err.response?.data?.message || 'Login failed. Please check credentials.';
             setError(message);
         }
