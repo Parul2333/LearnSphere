@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE_URL } from '../api/config.js';
+import { LocalStorage } from '../utils/storageManager.js';
 
 // Base API URL for public content structure
 const API_URL = `${API_BASE_URL}/content`; 
@@ -61,6 +62,12 @@ const YearSelection = () => {
                     <Link
                         to={`/branch/${branchId}/year/${year}`} 
                         key={String(year)}
+                        onClick={() => {
+                            // 🔥 STORE selected year in localStorage
+                            LocalStorage.setSelectedYear(String(year));
+                            LocalStorage.setSelectedBranch(branchData.name);
+                            LocalStorage.setLastVisitedPage(`/branch/${branchId}/year/${year}`);
+                        }}
                         className="block p-6 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition"
                     >
                         <div className="flex items-center justify-center h-24">
