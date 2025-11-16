@@ -3,14 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 import { LocalStorage } from '../utils/storageManager.js';
+import { API_BASE_URL } from '../api/config.js';
 
-// ✅ CRITICAL FIX: Use HTTPS API URL with self-signed cert bypass
-const API_URL = 'https://localhost:4430/api/content';
-
-// Configure axios to accept self-signed certificates in development
-if (process.env.NODE_ENV === 'development') {
-  axios.defaults.httpsAgent = { rejectUnauthorized: false };
-} 
+// Use the configured API base URL (handles HTTPS/HTTP automatically)
+const API_URL = `${API_BASE_URL}/content`; 
 
 const Home = () => {
     const { isDarkMode } = useTheme();
@@ -30,12 +26,26 @@ const Home = () => {
     useEffect(() => {
         const fetchBranches = async () => {
             try {
+                console.log(`[Home] Fetching branches from: ${API_URL}/branches`);
                 // ✅ FIX: Hitting the public /api/content/branches endpoint
                 const res = await axios.get(`${API_URL}/branches`); 
-                setBranches(res.data);
+                console.log(`[Home] Branches loaded:`, res.data);
+                setBranches(res.data || []);
             } catch (err) {
                 console.error("Error fetching branches:", err);
-                setError("Failed to load available branches. Check backend server and ensure /api/content/branches route is working.");
+                
+                // More detailed error message
+                let errorMessage = "Failed to load available branches. ";
+                if (err.code === 'ERR_NETWORK' || err.message.includes('Network Error')) {
+                    errorMessage += "Network error - check if backend server is running and certificate is accepted (for HTTPS).";
+                } else if (err.response?.status === 403 || err.response?.status === 401) {
+                    errorMessage += "Authentication error.";
+                } else if (err.response?.status === 404) {
+                    errorMessage += "Endpoint not found - check if /api/content/branches route exists.";
+                } else {
+                    errorMessage += `Error: ${err.response?.data?.message || err.message}`;
+                }
+                setError(errorMessage);
             } finally {
                 setLoading(false);
             }

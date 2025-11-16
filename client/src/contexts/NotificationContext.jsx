@@ -10,14 +10,18 @@ export const NotificationProvider = ({ children }) => {
     const [socket, setSocket] = useState(null);
 
     useEffect(() => {
-        // Determine server URL based on current protocol
-        // In development, try HTTPS first (4430), fallback to HTTP (5000)
+        // In development, always use HTTP for WebSocket to avoid certificate issues
+        // In production, use the same protocol as the frontend
+        const isDevelopment = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost';
         const isHttps = window.location.protocol === 'https:';
-        const serverPort = isHttps ? 4430 : 5000;
-        const serverUrl = `${window.location.protocol}//${window.location.hostname}:${serverPort}`;
+        
+        // Prefer HTTP in development, even if frontend is HTTPS
+        const useHttp = isDevelopment || !isHttps;
+        const serverPort = useHttp ? 5000 : 4430;
+        const serverUrl = useHttp ? `http://localhost:${serverPort}` : `https://localhost:${serverPort}`;
         
         console.log(`🔌 Connecting to WebSocket server: ${serverUrl}`);
-        console.log(`🔒 Protocol: ${window.location.protocol}, Port: ${serverPort}`);
+        console.log(`🔒 Development mode: ${isDevelopment}, Using HTTP: ${useHttp}, Port: ${serverPort}`);
         
         // Initialize Socket.io connection
         const newSocket = io(serverUrl, {
@@ -25,23 +29,59 @@ export const NotificationProvider = ({ children }) => {
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
             reconnectionAttempts: Infinity, // Keep trying to reconnect
-            transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
-            secure: isHttps,
+            transports: ['polling', 'websocket'], // Try polling first (more reliable), then websocket
+            secure: !useHttp,
             rejectUnauthorized: false, // Accept self-signed cert in dev (required for localhost HTTPS)
             timeout: 20000, // 20 second connection timeout
             forceNew: false, // Reuse existing connection if available
+            autoConnect: true, // Automatically connect when socket is created
+            withCredentials: true, // Send credentials (cookies, auth headers) with requests
         });
 
+        let hasConnected = false;
+
         newSocket.on('connect', () => {
+            hasConnected = true;
             console.log('✅ Connected to WebSocket notification server');
+            setSocket(newSocket);
         });
 
         newSocket.on('disconnect', (reason) => {
             console.log('❌ Disconnected from notification server:', reason);
+            if (reason === 'io server disconnect') {
+                // Server disconnected, don't try to reconnect
+                newSocket.disconnect();
+            }
         });
 
         newSocket.on('connect_error', (error) => {
             console.error('❌ WebSocket connection error:', error.message);
+            console.error('❌ Error details:', error);
+            
+            // If HTTPS fails in development, try HTTP as fallback
+            if (!useHttp && isDevelopment && !hasConnected) {
+                console.log('⚠️  HTTPS WebSocket failed, trying HTTP fallback...');
+                const httpSocket = io('http://localhost:5000', {
+                    reconnection: true,
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    reconnectionAttempts: Infinity,
+                    transports: ['polling', 'websocket'],
+                    timeout: 20000,
+                    autoConnect: true,
+                    withCredentials: true,
+                });
+                
+                httpSocket.on('connect', () => {
+                    console.log('✅ Connected to HTTP WebSocket fallback');
+                    setSocket(httpSocket);
+                    newSocket.disconnect(); // Disconnect the failed HTTPS socket
+                });
+                
+                httpSocket.on('connect_error', (err) => {
+                    console.error('❌ HTTP WebSocket fallback also failed:', err.message);
+                });
+            }
         });
 
         newSocket.on('reconnect', (attemptNumber) => {

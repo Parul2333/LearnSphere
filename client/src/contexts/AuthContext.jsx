@@ -1,17 +1,16 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { LocalStorage, SessionStorage } from '../utils/storageManager.js';
+import { API_BASE_URL } from '../api/config.js';
 
 // 1. Create the Context
 export const AuthContext = createContext();
 
-// Define the API base URL (HTTPS on port 4430 for local dev with self-signed cert)
-const API_URL = 'https://localhost:4430/api/auth';
+// Use the configured API base URL (handles HTTPS/HTTP automatically)
+const API_URL = `${API_BASE_URL}/auth`;
 
-// Configure axios to accept self-signed certificates in development
-if (process.env.NODE_ENV === 'development') {
-  axios.defaults.httpsAgent = { rejectUnauthorized: false };
-}
+// Note: httpsAgent doesn't work in browsers (only Node.js)
+// Browser will show certificate warning - user must accept it for HTTPS
 
 // 2. Auth Provider Component
 export const AuthProvider = ({ children }) => {
