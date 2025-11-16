@@ -1,14 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext.jsx';
+import { SessionStorage } from '../utils/storageManager.js';
 
 const Feedback = () => {
     const { isDarkMode } = useTheme();
-    const [rating, setRating] = useState(0);
-    const [feedbackText, setFeedbackText] = useState('');
-    const [category, setCategory] = useState('general');
+    
+    // 🔥 Load draft feedback from sessionStorage
+    const initialState = (() => {
+        const uiState = SessionStorage.getTempUIState();
+        return uiState?.feedbackDraft || { rating: 0, text: '', category: 'general' };
+    })();
+    
+    const [rating, setRating] = useState(initialState.rating);
+    const [feedbackText, setFeedbackText] = useState(initialState.text);
+    const [category, setCategory] = useState(initialState.category);
     const [submitted, setSubmitted] = useState(false);
     const [loading, setLoading] = useState(false);
+    
+    // 🔥 Save draft feedback to sessionStorage on every change
+    useEffect(() => {
+        const uiState = SessionStorage.getTempUIState();
+        uiState.feedbackDraft = { rating, text: feedbackText, category };
+        SessionStorage.setTempUIState(uiState);
+    }, [rating, feedbackText, category]);
 
     const categories = ['general', 'feature-request', 'bug-report', 'improvement', 'other'];
 
@@ -28,6 +43,12 @@ const Feedback = () => {
             setRating(0);
             setFeedbackText('');
             setCategory('general');
+            
+            // 🔥 Clear draft from sessionStorage after submission
+            const uiState = SessionStorage.getTempUIState();
+            uiState.feedbackDraft = { rating: 0, text: '', category: 'general' };
+            SessionStorage.setTempUIState(uiState);
+            
             setTimeout(() => setSubmitted(false), 5000);
         } catch (error) {
             console.error('Error submitting feedback:', error);
