@@ -1,13 +1,14 @@
 // client/src/contexts/ThemeContext.jsx
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { LocalStorage } from '../utils/storageManager.js';
 
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         // Check localStorage for saved preference
-        const saved = localStorage.getItem('theme');
+        const saved = LocalStorage.getTheme();
         if (saved) return saved === 'dark';
         // Check system preference
         return window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -15,7 +16,7 @@ export const ThemeProvider = ({ children }) => {
 
     useEffect(() => {
         // Update localStorage and document class
-        localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+        LocalStorage.setTheme(isDarkMode ? 'dark' : 'light');
         const root = document.documentElement;
         if (isDarkMode) {
             root.classList.add('dark');
