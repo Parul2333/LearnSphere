@@ -1,8 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
-
-// Simple, minimal footer to avoid complexity and ensure reliability
 const Footer = () => {
   const { isDarkMode } = useTheme();
   const currentYear = new Date().getFullYear();
