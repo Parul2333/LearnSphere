@@ -24,6 +24,7 @@ const SearchBar = () => {
 
     useEffect(() => {
         if (query.length < 1) {
+           
             const history = SessionStorage.getSessionSearchHistory();
             setSuggestions(history);
             return;
@@ -36,7 +37,7 @@ const SearchBar = () => {
             } catch (error) {
                 console.error('Suggestions error:', error);
             }
-        }, 300); 
+        }, 300); // Debounce
 
         return () => clearTimeout(timer);
     }, [query]);
