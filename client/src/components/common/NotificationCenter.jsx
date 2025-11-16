@@ -1,10 +1,57 @@
 // client/src/components/common/NotificationCenter.jsx
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNotifications } from '../../contexts/NotificationContext.jsx';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 
 const NotificationCenter = () => {
     const { notifications, removeNotification } = useNotifications();
+    const { user } = useAuth(); // Get user from auth context
+    
+    // 🔥 IMPORTANT: Keep notifPrefs ONLY in component state - NOT in sessionStorage
+    // This ensures each session is completely fresh and doesn't persist data
+    const [notifPrefs, setNotifPrefs] = useState(() => {
+        // If user is logged in, initialize with fresh defaults
+        if (user) {
+            return {
+                enabled: true,
+                newContent: true,
+                newSubject: true,
+                progressUpdate: true,
+                adminMessage: true,
+                sound: true,
+                desktop: false,
+            };
+        }
+        
+        // If no user logged in, return empty
+        return {};
+    });
+
+    // 🔥 Reset preferences when user changes (login/logout)
+    useEffect(() => {
+        if (user) {
+            setNotifPrefs({
+                enabled: true,
+                newContent: true,
+                newSubject: true,
+                progressUpdate: true,
+                adminMessage: true,
+                sound: true,
+                desktop: false,
+            });
+        } else {
+            setNotifPrefs({});
+        }
+    }, [user]); // Reset when user changes
+
+    // 🔥 Handler for updating preferences (in-memory only, not persisted)
+    const updateNotificationPreference = (key, value) => {
+        setNotifPrefs(prev => ({
+            ...prev,
+            [key]: value,
+        }));
+    };
 
     const getNotificationIcon = (type) => {
         switch (type) {
