@@ -5,6 +5,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 import { API_BASE_URL } from '../../api/config.js';
+import { SessionStorage } from '../../utils/storageManager.js';
 
 const API_URL = `${API_BASE_URL}/search`;
 
@@ -17,10 +18,18 @@ const SearchBar = () => {
     const suggestionsRef = useRef(null);
     const navigate = useNavigate();
 
+    // Load search history from sessionStorage on mount
+    useEffect(() => {
+        const history = SessionStorage.getSessionSearchHistory();
+        setSuggestions(history);
+    }, []);
+
     // Fetch suggestions as user types
     useEffect(() => {
         if (query.length < 1) {
-            setSuggestions([]);
+            // Show history if available
+            const history = SessionStorage.getSessionSearchHistory();
+            setSuggestions(history);
             return;
         }
 
@@ -52,6 +61,17 @@ const SearchBar = () => {
         if (searchQuery.trim().length < 2) {
             alert('Please enter at least 2 characters.');
             return;
+        }
+
+        // 🔥 STORE search query in sessionStorage
+        const history = SessionStorage.getSessionSearchHistory();
+        if (!history.includes(searchQuery)) {
+            history.push(searchQuery);
+            // Limit to 10 items
+            if (history.length > 10) {
+                history.shift();
+            }
+            SessionStorage.setSessionSearchHistory(history);
         }
 
         setLoading(true);
