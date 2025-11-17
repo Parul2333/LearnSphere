@@ -25,9 +25,9 @@ const Navbar = () => {
     };
 
     const navLinks = [
-        { name: 'Home', path: '/', icon: '🏠' },
-        { name: 'Contact', path: '/contact', icon: '📞' },
-        { name: 'Feedback', path: '/feedback', icon: '💬' },
+        { name: 'Home', path: '/' },
+        { name: 'Contact', path: '/contact' },
+        { name: 'Feedback', path: '/feedback' },
     ];
 
     return (
@@ -36,7 +36,7 @@ const Navbar = () => {
                 <div className="flex items-center justify-between">
                     {/* Logo/Brand */}
                     <Link to="/" className="flex items-center gap-2 text-2xl font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors group">
-                        <span className="text-3xl group-hover:scale-110 transition-transform">📚</span>
+                        <span className="text-3xl group-hover:scale-110 transition-transform"></span>
                         <span className="hidden sm:inline">LearnSphere</span>
                     </Link>
 
