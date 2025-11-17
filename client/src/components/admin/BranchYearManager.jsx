@@ -8,18 +8,18 @@ const API_URL = `${API_BASE_URL}/admin`;
 
 const BranchYearManager = ({ showStatus }) => {
     const { token } = useAuth();
-    const [structure, setStructure] = useState([]); // Array of { _id, name, years } objects from DB
+    const [structure, setStructure] = useState([]); 
     const [loading, setLoading] = useState(true);
     
     const [newBranchName, setNewBranchName] = useState('');
     const [yearsInput, setYearsInput] = useState('First Year, Second Year, Third Year, Fourth Year');
     const [selectedBranchId, setSelectedBranchId] = useState(''); // Stores the branch ID for deletion
 
-    // --- Data Fetching: Load Structure from MongoDB ---
+    
     const fetchStructure = async () => {
         setLoading(true);
         try {
-            // GET request to fetch all branches
+            
             const res = await axios.get(`${API_URL}/branches`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -35,13 +35,12 @@ const BranchYearManager = ({ showStatus }) => {
 
     useEffect(() => {
         fetchStructure();
-    }, []); // Run only on component mount
+    }, []); 
 
-    // --- Add Branch Handler: Sends data to MongoDB ---
     const handleAddBranch = async (e) => {
         e.preventDefault();
         const branchName = newBranchName.trim();
-        // Convert comma-separated string to an array of trimmed strings
+        
         const yearsArray = yearsInput.split(',').map(y => y.trim()).filter(y => y);
 
         if (!branchName || yearsArray.length === 0) {
@@ -50,7 +49,6 @@ const BranchYearManager = ({ showStatus }) => {
         }
 
         try {
-            // POST request to create new branch in MongoDB
             await axios.post(`${API_URL}/branches`, { name: branchName, years: yearsArray }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -58,14 +56,13 @@ const BranchYearManager = ({ showStatus }) => {
             showStatus(`Branch '${branchName}' added successfully!`, 'success');
             setNewBranchName('');
             setYearsInput('First Year, Second Year, Third Year, Fourth Year');
-            fetchStructure(); // Refresh list immediately
+            fetchStructure(); 
         } catch (error) {
             const msg = error.response?.data?.message || 'Error adding branch.';
             showStatus(msg, 'error');
         }
     };
 
-    // --- Delete Branch Handler: Triggers Cascade Delete in Backend ---
     const handleDeleteBranch = async () => {
         if (!selectedBranchId) {
             showStatus('Please select a branch to delete.', 'error');
@@ -78,14 +75,14 @@ const BranchYearManager = ({ showStatus }) => {
         
         if (confirmation) {
             try {
-                // DELETE request to trigger cascade delete logic in the controller
+                
                 const res = await axios.delete(`${API_URL}/branches/${selectedBranchId}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 
-                showStatus(res.data.message, 'success'); // Shows the cascade success message
+                showStatus(res.data.message, 'success'); 
                 setSelectedBranchId('');
-                fetchStructure(); // Refresh list
+                fetchStructure(); 
             } catch (error) {
                 const msg = error.response?.data?.message || 'Error deleting branch.';
                 showStatus(msg, 'error');
