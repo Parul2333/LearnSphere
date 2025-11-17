@@ -67,6 +67,9 @@ export const registerUser = async (req, res) => {
 // @access  Public
 export const loginUser = async (req, res) => {
     const { email, password, rememberMe } = req.body; // 💡 Get rememberMe flag
+    
+    // Debug logging
+    console.log(`[Login] Attempt for: ${email}, rememberMe: ${rememberMe} (type: ${typeof rememberMe})`);
 
     try {
         const user = await User.findOne({ email });
@@ -85,10 +88,23 @@ export const loginUser = async (req, res) => {
             const token = generateToken(user._id, user.role, rememberMe);
 
             // 💡 REMEMBER ME CACHE: Store token in Redis if requested
-            if (rememberMe && redis && redis.status === 'ready') {
-                const sessionKey = `user_session:${user._id}`;
-                // Store the token for a long period (90 days)
-                await redis.set(sessionKey, token, 'EX', 90 * 24 * 60 * 60); 
+            if (rememberMe) {
+                if (!redis) {
+                    console.warn('[Remember Me] Redis not available, cannot store session');
+                } else if (redis.status !== 'ready') {
+                    console.warn(`[Remember Me] Redis status: ${redis.status}, cannot store session`);
+                } else {
+                    try {
+                        const sessionKey = `user_session:${user._id}`;
+                        // Store the token for a long period (90 days)
+                        await redis.set(sessionKey, token, 'EX', 90 * 24 * 60 * 60);
+                        console.log(`[Remember Me] Session stored in Redis: ${sessionKey} (90 days)`);
+                    } catch (error) {
+                        console.error('[Remember Me] Failed to store session in Redis:', error);
+                    }
+                }
+            } else {
+                console.log('[Remember Me] Not requested, skipping Redis session storage');
             }
 
             return res.json({

@@ -28,12 +28,28 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let server, io;
+let httpsServer, httpServer, io;
 
 const initializeSocketIO = (httpServer) => {
+  // Allow both HTTP and HTTPS frontend URLs for WebSocket connections
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'https://localhost:5173',
+    'http://localhost:3000',
+    'https://localhost:3000',
+    process.env.CLIENT_URL
+  ].filter(Boolean);
+  
   const socketIO = new socketio(httpServer, { 
     cors: { 
-      origin: process.env.CLIENT_URL || "*", 
+      origin: function (origin, callback) {
+        // Allow requests with no origin or from allowed origins
+        if (!origin || allowedOrigins.includes('*') || allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       methods: ["GET", "POST"],
       credentials: true
     },
@@ -53,7 +69,31 @@ const initializeSocketIO = (httpServer) => {
 };
 
 app.use(incrementAccessCounter);
-app.use(cors());
+
+// Configure CORS to allow both HTTP and HTTPS frontend URLs
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://localhost:5173',
+    'http://localhost:3000',
+    'https://localhost:3000',
+    process.env.CLIENT_URL
+].filter(Boolean); // Remove undefined values
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps, curl, Postman)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 const clientDist = path.join(__dirname, "..", "client", "dist");
@@ -76,37 +116,42 @@ const PORT = process.env.PORT || 5000;
 const HTTPS_PORT = process.env.HTTPS_PORT || 4430;
 
 if (process.env.NODE_ENV !== "test") { 
+    // Always start HTTP server
+    httpServer = http.createServer(app);
+    io = initializeSocketIO(httpServer);
+    setSocketIO(io); // Make io instance available to controllers
+    httpServer.listen(PORT, () => {
+        console.log(`\n✅ HTTP Server: http://localhost:${PORT}`);
+        console.log(`✅ WebSocket Server: ws://localhost:${PORT}`);
+    });
+
+    // Also start HTTPS server if certificates exist (for REST API calls)
     const certDir = path.join(__dirname, "certs");
     const keyPath = path.join(certDir, "key.pem");
     const certPath = path.join(certDir, "cert.pem");
 
-    try {
-        if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+    if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+        try {
             const key = fs.readFileSync(keyPath);
             const cert = fs.readFileSync(certPath);
-            server = https.createServer({ key, cert }, app);
-            io = initializeSocketIO(server);
-            setSocketIO(io); // Make io instance available to controllers
-            server.listen(HTTPS_PORT, () => {
-                console.log(`\n✅ HTTPS Server: https://localhost:${HTTPS_PORT}`);
+            httpsServer = https.createServer({ key, cert }, app);
+            // Attach Socket.io to HTTPS server as well for wss:// connections
+            const httpsIO = initializeSocketIO(httpsServer);
+            // Keep using the HTTP io instance as primary, but HTTPS can also handle connections
+            httpsServer.listen(HTTPS_PORT, () => {
+                console.log(`✅ HTTPS Server: https://localhost:${HTTPS_PORT}`);
                 console.log(`✅ WebSocket Server: wss://localhost:${HTTPS_PORT}`);
             });
-        } else {
-            throw new Error("Certs not found");
+        } catch (e) {
+            console.warn("HTTPS server failed to start:", e?.message);
+            console.log("⚠️  Continuing with HTTP server only");
         }
-    } catch (e) {
-        console.warn("HTTPS failed:", e?.message);
-        server = http.createServer(app);
-        io = initializeSocketIO(server);
-        setSocketIO(io); // Make io instance available to controllers
-        server.listen(PORT, () => {
-            console.log(`\n✅ HTTP Server: http://localhost:${PORT}`);
-            console.log(`✅ WebSocket Server: ws://localhost:${PORT}`);
-        });
+    } else {
+        console.log("⚠️  SSL certificates not found - running HTTP server only");
     }
 }
 
 // Export io instance for use in controllers
-export { io };
+export { io, httpsServer, httpServer };
 
 export default app;

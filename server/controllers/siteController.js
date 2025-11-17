@@ -22,24 +22,52 @@ export const incrementAccessCounter = async (req, res, next) => {
         return next();
     }
     
-    // Only count HTML page requests (actual page visits)
-    // Check if request accepts HTML (browser page load) vs JSON (API call)
-    const acceptsHtml = req.accepts('html');
-    const isApiRequest = req.accepts('json') && !acceptsHtml;
-    
-    if (isApiRequest) {
+    // Skip WebSocket upgrade requests
+    if (req.headers.upgrade === 'websocket') {
         return next();
     }
     
-    // Only increment if Redis is available
-    if (redis && redis.status === 'ready') {
-        try {
-            // INCR is atomic and safe for concurrent access
-            await redis.incr(COUNTER_KEY);
-        } catch (error) {
-            console.error("[Redis Counter] Failed to increment counter:", error);
+    // Check if this is a page visit (not an API call)
+    // In development, Vite serves the frontend on port 5173, so requests to Express (5000/4430) 
+    // are usually API calls. But when serving built files, we need to count page visits.
+    const acceptHeader = req.headers.accept || '';
+    const userAgent = req.headers['user-agent'] || '';
+    
+    // Determine if this is a page visit:
+    // 1. Must be GET request
+    // 2. Must accept HTML (or no specific accept header)
+    // 3. Must not be an API client (no axios/fetch with JSON accept)
+    const isGetRequest = req.method === 'GET';
+    const acceptsHtml = acceptHeader.includes('text/html') || 
+                       acceptHeader.includes('*/*') ||
+                       acceptHeader === '' ||
+                       (!acceptHeader.includes('application/json') && 
+                        !acceptHeader.includes('application/xml') &&
+                        !acceptHeader.includes('application/javascript'));
+    
+    // Don't count if it's clearly an API request
+    const isApiRequest = acceptHeader.includes('application/json') && 
+                        (userAgent.includes('axios') || userAgent.includes('node') || userAgent === '');
+    
+    const isPageRequest = isGetRequest && acceptsHtml && !isApiRequest;
+    
+    // Only increment for actual page visits
+    if (isPageRequest) {
+        // Only increment if Redis is available
+        if (redis && redis.status === 'ready') {
+            try {
+                // INCR is atomic and safe for concurrent access
+                const newCount = await redis.incr(COUNTER_KEY);
+                // Log for debugging (can be removed in production)
+                console.log(`[Access Counter] Incremented to ${newCount} for path: ${req.path}`);
+            } catch (error) {
+                console.error("[Redis Counter] Failed to increment counter:", error);
+            }
+        } else {
+            console.warn("[Access Counter] Redis not ready, skipping increment");
         }
     }
+    
     next(); // Always proceed
 };
 

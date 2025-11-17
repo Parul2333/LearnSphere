@@ -3,7 +3,7 @@ import redis from '../config/redis.js';
 // Configuration constants
 // NOTE: Per product requirement, lock the user after a single failed attempt
 // for 30 minutes. Adjust MAX_LOGIN_ATTEMPTS if you'd prefer a higher threshold.
-const MAX_LOGIN_ATTEMPTS = 1;
+const MAX_LOGIN_ATTEMPTS = 3;
 export const LOCKOUT_TIME_SECONDS = 30 * 60; // 30 minutes
 
 // Helper to construct the key in Redis (use email to identify the user)
