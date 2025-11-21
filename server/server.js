@@ -19,6 +19,7 @@ import searchRoutes from "./routes/searchRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import { incrementAccessCounter } from "./controllers/siteController.js";
 import { setupNotificationEvents } from "./events/notificationEvents.js";
+
 import { setSocketIO } from "./utils/socket.js";
 
 dotenv.config({ path: "../.env" });
@@ -28,7 +29,9 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let httpsServer, httpServer, io;
+let httpsServer;
+let httpServer;
+let io;
 
 const initializeSocketIO = (httpServer) => {
   // Allow both HTTP and HTTPS frontend URLs for WebSocket connections
@@ -40,11 +43,11 @@ const initializeSocketIO = (httpServer) => {
     process.env.CLIENT_URL
   ].filter(Boolean);
   
-  const socketIO = new socketio(httpServer, { 
+    const socketIO = new socketio(httpServer, { 
     cors: { 
       origin: function (origin, callback) {
-        // Allow requests with no origin or from allowed origins
-        if (!origin || allowedOrigins.includes('*') || allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+        // Allow requests with no origin, any localhost origin, or from configured allowed origins
+        if (!origin || origin.includes('localhost') || allowedOrigins.includes('*') || allowedOrigins.some(allowed => allowed && origin.startsWith(allowed))) {
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));
@@ -82,12 +85,19 @@ const allowedOrigins = [
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps, curl, Postman)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
+      if (!origin) return callback(null, true);
+
+      // Allow any localhost origin (any port)
+      if (origin?.includes && origin.includes('localhost')) {
+        return callback(null, true);
+      }
+
+      // Allow explicit origins or wildcard
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -153,5 +163,3 @@ if (process.env.NODE_ENV !== "test") {
 
 // Export io instance for use in controllers
 export { io, httpsServer, httpServer };
-
-export default app;

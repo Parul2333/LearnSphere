@@ -5,15 +5,11 @@ import axios from 'axios';
 const getApiBaseUrl = () => {
   // Check if we're in browser environment
   if (typeof window !== 'undefined') {
-    const isDevelopment = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost';
+    // Use the same protocol as the frontend by default to avoid mixed-content warnings
     const isHttps = window.location.protocol === 'https:';
-    
-    // In development, prefer HTTP to avoid certificate issues
-    // In production, match the frontend protocol
-    const useHttp = isDevelopment || !isHttps;
-    const apiPort = useHttp ? 5000 : 4430;
-    const apiProtocol = useHttp ? 'http:' : 'https:';
-    
+    const apiPort = isHttps ? 4430 : 5000;
+    const apiProtocol = isHttps ? 'https:' : 'http:';
+
     return `${apiProtocol}//${window.location.hostname}:${apiPort}/api`;
   }
   // Fallback for SSR or Node.js environments

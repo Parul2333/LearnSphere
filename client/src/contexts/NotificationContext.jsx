@@ -10,19 +10,15 @@ export const NotificationProvider = ({ children }) => {
     const [socket, setSocket] = useState(null);
 
     useEffect(() => {
-        // In development, always use HTTP for WebSocket to avoid certificate issues
-        // In production, use the same protocol as the frontend
-        const isDevelopment = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost';
-        const isHttps = window.location.protocol === 'https:';
-        
-        // Prefer HTTP in development, even if frontend is HTTPS
-        const useHttp = isDevelopment || !isHttps;
-        const serverPort = useHttp ? 5000 : 4430;
-        const serverUrl = useHttp ? `http://localhost:${serverPort}` : `https://localhost:${serverPort}`;
-        
+        // Use the same protocol/host as the frontend to avoid mixed-content issues
+        const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+        const isDevelopment = process.env.NODE_ENV !== 'production';
+        const serverPort = isHttps ? 4430 : 5000;
+        const protocol = isHttps ? 'https' : 'http';
+        const serverUrl = `${protocol}://${window.location.hostname}:${serverPort}`;
+
         console.log(`🔌 Connecting to WebSocket server: ${serverUrl}`);
-        console.log(`🔒 Development mode: ${isDevelopment}, Using HTTP: ${useHttp}, Port: ${serverPort}`);
-        
+
         // Initialize Socket.io connection
         const newSocket = io(serverUrl, {
             reconnection: true,
@@ -30,8 +26,10 @@ export const NotificationProvider = ({ children }) => {
             reconnectionDelayMax: 5000,
             reconnectionAttempts: Infinity, // Keep trying to reconnect
             transports: ['polling', 'websocket'], // Try polling first (more reliable), then websocket
-            secure: !useHttp,
-            rejectUnauthorized: false, // Accept self-signed cert in dev (required for localhost HTTPS)
+            secure: isHttps,
+            // rejectUnauthorized left false only for development when necessary. If your CA is trusted,
+            // set to true. We'll set to false only if running in development and the cert is self-signed.
+            rejectUnauthorized: process.env.NODE_ENV === 'development' ? false : true,
             timeout: 20000, // 20 second connection timeout
             forceNew: false, // Reuse existing connection if available
             autoConnect: true, // Automatically connect when socket is created
@@ -57,31 +55,8 @@ export const NotificationProvider = ({ children }) => {
         newSocket.on('connect_error', (error) => {
             console.error('❌ WebSocket connection error:', error.message);
             console.error('❌ Error details:', error);
-            
-            // If HTTPS fails in development, try HTTP as fallback
-            if (!useHttp && isDevelopment && !hasConnected) {
-                console.log('⚠️  HTTPS WebSocket failed, trying HTTP fallback...');
-                const httpSocket = io('http://localhost:5000', {
-                    reconnection: true,
-                    reconnectionDelay: 1000,
-                    reconnectionDelayMax: 5000,
-                    reconnectionAttempts: Infinity,
-                    transports: ['polling', 'websocket'],
-                    timeout: 20000,
-                    autoConnect: true,
-                    withCredentials: true,
-                });
-                
-                httpSocket.on('connect', () => {
-                    console.log('✅ Connected to HTTP WebSocket fallback');
-                    setSocket(httpSocket);
-                    newSocket.disconnect(); // Disconnect the failed HTTPS socket
-                });
-                
-                httpSocket.on('connect_error', (err) => {
-                    console.error('❌ HTTP WebSocket fallback also failed:', err.message);
-                });
-            }
+            // Do not attempt an HTTP fallback from an HTTPS page — this causes mixed-content.
+            // In development, inspect the server and certificate instead of falling back to HTTP.
         });
 
         newSocket.on('reconnect', (attemptNumber) => {
