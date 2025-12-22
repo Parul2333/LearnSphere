@@ -1,29 +1,49 @@
 import request from 'supertest';
-import app from '../server.js';
+import { app } from '../server.js';
 import User from '../models/User.js';
 import mongoose from 'mongoose';
 
 // Cleanup helper
 const cleanDatabase = async () => {
-    await User.deleteMany({});
+    // Only clean if connection is ready
+    if (mongoose.connection.readyState === 1) {
+        try {
+            await User.deleteMany({});
+        } catch (error) {
+            // Ignore errors if connection is not ready
+            console.warn('Cleanup warning:', error.message);
+        }
+    }
 };
 
 // Setup/Teardown
 beforeAll(async () => {
+    process.env.NODE_ENV = 'test';
     if (mongoose.connection.readyState === 0) {
-        await mongoose.connect(process.env.MONGO_URI);
+        await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/learnsphere-test', {
+            serverSelectionTimeoutMS: 5000,
+        });
     }
-    await cleanDatabase();
-});
+    // Wait a bit for connection to be fully ready
+    if (mongoose.connection.readyState === 1) {
+        await cleanDatabase();
+    }
+}, 15000);
 
 afterAll(async () => {
     await cleanDatabase();
     // Wait for Redis and connections to close properly
     await new Promise(resolve => setTimeout(resolve, 1000));
+    // Only close if we're the last test using this connection
+    // When running all tests together, let the last test file clean up
     if (mongoose.connection.readyState === 1) {
-        await mongoose.connection.close();
+        try {
+            await mongoose.connection.close();
+        } catch (error) {
+            // Ignore if already closed by another test
+        }
     }
-});
+}, 10000);
 
 // Unit Test 1: Successful Admin Registration
 describe('POST /api/auth/register', () => {

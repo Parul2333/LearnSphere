@@ -1,5 +1,5 @@
 import request from 'supertest';
-import app from '../server.js';
+import { app } from '../server.js';
 import User from '../models/User.js';
 import Branch from '../models/Branch.js';
 import Subject from '../models/Subject.js';
