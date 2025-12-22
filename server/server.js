@@ -12,6 +12,8 @@ import connectDB from "./config/db.js";
 import redis from "./config/redis.js"; 
 import mongoose from "mongoose";
 
+import quoteRoutes from './routes/quoteRoutes.js';
+import contactRoutes from './routes/contactRoutes.js';
 import userRoutes from "./routes/userRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js"; 
 import contentRoutes from "./routes/contentRoutes.js";
@@ -23,7 +25,10 @@ import { setupNotificationEvents } from "./events/notificationEvents.js";
 import { setSocketIO } from "./utils/socket.js";
 
 dotenv.config({ path: "../.env" });
-connectDB();
+// Only connect to the real database if we are NOT in test mode
+if (process.env.NODE_ENV !== 'test') {
+    connectDB();
+}
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -37,9 +42,11 @@ const initializeSocketIO = (httpServer) => {
   // Allow both HTTP and HTTPS frontend URLs for WebSocket connections
   const allowedOrigins = [
     'http://localhost:5173',
-    'https://localhost:5173',
+    process.env.CLIENT_URL_ONLY,
     'http://localhost:3000',
     'https://localhost:3000',
+    // 'http://34.224.60.209:5000',
+    // 'https://34.224.60.209:5000',
     process.env.CLIENT_URL
   ].filter(Boolean);
   
@@ -79,6 +86,8 @@ const allowedOrigins = [
     'https://localhost:5173',
     'http://localhost:3000',
     'https://localhost:3000',
+    // 'http://34.224.60.209:5000',
+    // 'https://34.224.60.209:5000',
     process.env.CLIENT_URL
 ].filter(Boolean); // Remove undefined values
 
@@ -116,11 +125,14 @@ if (fs.existsSync(clientDist)) {
 
 app.get("/api/health", (req, res) => res.json({ mongodb: mongoose.connection?.readyState, redis: redis?.status }));
 
+// --- API ROUTES ---
 app.use("/api/auth", userRoutes); 
 app.use("/api/admin", adminRoutes); 
 app.use("/api/content", contentRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/admin/analytics", analyticsRoutes);
+app.use("/api/contact", contactRoutes); // ✅ Added Contact Route
+app.use('/api/quotes', quoteRoutes);
 
 const PORT = process.env.PORT || 5000;
 const HTTPS_PORT = process.env.HTTPS_PORT || 4430;
@@ -130,7 +142,7 @@ if (process.env.NODE_ENV !== "test") {
     httpServer = http.createServer(app);
     io = initializeSocketIO(httpServer);
     setSocketIO(io); // Make io instance available to controllers
-    httpServer.listen(PORT, () => {
+    httpServer.listen(PORT,"0.0.0.0", () => {
         console.log(`\n✅ HTTP Server: http://localhost:${PORT}`);
         console.log(`✅ WebSocket Server: ws://localhost:${PORT}`);
     });
@@ -162,4 +174,4 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 // Export io instance for use in controllers
-export { io, httpsServer, httpServer };
+export { app, io, httpsServer, httpServer };
