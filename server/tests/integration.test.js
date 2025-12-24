@@ -58,6 +58,7 @@ describe('Integration Tests', () => {
   
   // --- Your original test code continues here ---
 
+
   // --- 1. AUTHENTICATION TESTS ---
   describe('Authentication', () => {
     it('should register a new user', async () => {
