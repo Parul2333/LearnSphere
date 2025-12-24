@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "server": "cross-env NODE_OPTIONS='--tls-min-v1.0' nodemon server.js",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testTimeout=15000 --forceExit"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testTimeout=15000 --forceExit --detectOpenHandles"
   },
   "jest": {
     "testEnvironment": "node",
