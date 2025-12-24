@@ -315,6 +315,7 @@ describe('Functional Test 3: Student Content Browsing', () => {
         }
     });
 
+    
     // Test 3.4: Search content
     it('should search content by title', async () => {
         const res = await request(app)
