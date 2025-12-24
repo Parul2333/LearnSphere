@@ -96,6 +96,7 @@ describe('POST /api/auth/register', () => {
     });
 });
 
+
 // Functional Test 3: Successful Login
 describe('POST /api/auth/login', () => {
     const uniqueId = `${Date.now()}${Math.random()}`;
